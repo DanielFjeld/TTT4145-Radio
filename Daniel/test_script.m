@@ -26,7 +26,7 @@ rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
-tx = sdrtx('Pluto','Gain', -30);
+tx = sdrtx('Pluto','Gain', -0);
 tx.CenterFrequency = 916e6;
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
@@ -48,7 +48,7 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
 channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
-    'FrequencyOffset',1e2, ...
+    'FrequencyOffset',1e4, ...
     'SampleRate',1e6);
 
 %% Instantiate communication toolbox blocks
