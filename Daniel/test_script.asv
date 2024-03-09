@@ -11,7 +11,7 @@ clear all;
 %% Parameters
 
 
-Message = 'Hi';
+Message = 'test';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
 
@@ -88,9 +88,30 @@ crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions
 CRCtxBits = [int2bit(msgSet, 7); int2bit(Number, Number_size);]; %CRC frame
 CRCtxData = crcGen(CRCtxBits)
 
+%% hamming encoding
+
+k = size(CRCtxData, 1)
+r = ceil(log2(k))
+% Adjust r until the condition is met: 2^r >= k + r + 1
+while 2^r < k + r + 1
+    r = r + 1;
+end
+% Calculate the total codeword length n
+n = 2^r - 1
+k = n - r
+
+HammingCode = encode(CRCtxData, n, k, 'hamming/binary');
+
+
+
 %% frame 
 zero = zeros(1000, 1);
-MessageBits = [seq; seq; CRCtxData;]; %frame
+if(mod(size(HammingCode,1),2) == 1)%must be integer multiple of bits per symbol (2)
+    MessageBits = [seq; seq; HammingCode; zeros(1, 1);]; %need to add a zero at the end
+else
+    MessageBits = [seq; seq; HammingCode;]; 
+end
+
 
 Zero_padding = [zero; MessageBits; zero;]; %frame
 
@@ -123,14 +144,8 @@ end
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 synchronizedSymbol = symbolSynchronizer(synchronizedCarrier);
-
-
-
-
 rxData = qpskdemod(synchronizedCarrier) %generate bits from const diagram
-%rxData = MessageBits
 %find start of frame
-
 
 %% detect frame start
 bar = barker();
@@ -145,8 +160,28 @@ index = i-(L+1)/2 %dont know if this is correct
 
 sizeOfBarker = 13*2;
 startOfFrame = index+sizeOfBarker+1;
-endOfFrame = startOfFrame+size(CRCtxData)-1;
-DetectedRxData = rxData(startOfFrame:endOfFrame);
+
+endOfFrame = startOfFrame+size(CRCtxData, 1)-1;
+
+Hamming_EOF = startOfFrame+size(HammingCode, 1)-1;
+HammingDecData = rxData(startOfFrame:Hamming_EOF);
+
+%% hamming decoding
+size(HammingCode, 1);
+HammingRxData = HammingDecData(1:size(HammingCode, 1)); %get data
+
+DetectedRxData = decode(HammingCode,n,k,'hamming/binary');
+DetectedRxData = DetectedRxData(1:size(CRCtxData, 1));
+
+HammingErrors = biterr(CRCtxData, DetectedRxData, [], 'column-wise');
+HammingErrorRate = errors/size(DetectedRxData, 1);
+HammingFormatSpec = 'Before Hamming, error on %2d out of %2d bits = %.5f\n';
+fprintf(formatSpec,errors, size(DetectedRxData, 1), errorRate);
+
+errors = biterr(CRCtxData, DetectedRxData, [], 'column-wise');
+errorRate = errors/size(DetectedRxData, 1);
+formatSpec = 'After Hamming, Error on %2d out of %2d bits = %.5f\n';
+fprintf(formatSpec,errors, size(DetectedRxData, 1), errorRate);
 
 %% CRC check
 % Create a CRC detector with the same settings as the generator
@@ -167,23 +202,26 @@ messageBits = DetectedRxData(1:endOfMessage);
 
 % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
 % This might need adjustment based on how the bits are packed and the total length
-messageBitsReshaped = reshape(messageBits, 7, [])';
+messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remove ; and add '
 
 % Convert each 7-bit group to a character
-decodedMessage = char(bin2dec(num2str(messageBitsReshaped)))'
+decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
 
 %% Extract number
 number_index_start = endOfMessage+1;
 number_index_stop = number_index_start+Number_size-1;
 rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
-rx_number = bit2int(rx_number_bits,Number_size)
+rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
 errors = biterr(CRCtxData, DetectedRxData, [], 'column-wise');
 errorRate = errors/size(DetectedRxData, 1);
 formatSpec = 'Error on %2d out of %2d bits = %.5f\n';
 fprintf(formatSpec,errors, size(DetectedRxData, 1), errorRate);
-fprintf("DONE \n\n\r");
+
+%% Print data recived
+formatSpec = '%s %d\n';
+fprintf(formatSpec, decodedMessage, rx_number);
 
 %% print diagrams
 %constDiagram1(txData)
