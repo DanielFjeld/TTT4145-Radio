@@ -11,7 +11,7 @@ clear all;
 %% Parameters
 
 
-Message = 'test';
+Message = 'Hei Hei ';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
 
@@ -175,7 +175,7 @@ HammingDecData = rxData(startOfFrame:Hamming_EOF);
 size(HammingCode, 1);
 HammingRxData = HammingDecData(1:size(HammingCode, 1)); %get data
 
-DetectedRxData = decode(HammingCode,n,k,'hamming/binary');
+DetectedRxData = decode(HammingRxData,n,k,'hamming/binary');
 DetectedRxData = DetectedRxData(1:size(CRCtxData, 1));
 
 %% CRC check
@@ -183,12 +183,6 @@ DetectedRxData = DetectedRxData(1:size(CRCtxData, 1));
 crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 % Check the received data for CRC errors
 [detectedData, errFlag] = crcDet(DetectedRxData);
-
-if(errFlag)
-    disp('CRC ERROR');
-else
-    disp('CRC OK');
-end
 
 %% reshape bits
 % Extract the message bits after the Barker codes
@@ -219,8 +213,14 @@ errorRate = errors/size(DetectedRxData, 1);
 formatSpec = 'After  Hamming, error on %2d out of %2d bits = %.5f\n';
 fprintf(formatSpec,errors, size(DetectedRxData, 1), errorRate);
 
+if(errFlag)
+    disp('CRC ERROR');
+else
+    disp('CRC OK');
+end
+
 %% Print data recived
-formatSpec = '%s %d\n';
+formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
 
 %% print diagrams
