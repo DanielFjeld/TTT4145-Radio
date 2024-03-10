@@ -1,13 +1,9 @@
 %%coments
 % %% will give a new line to split up code
-
 % clear all, will clear persistant variables wich may be stuck after last compile
-
 clear all;
 
 %% Parameters
-
-
 Message = 'N';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
@@ -68,7 +64,7 @@ agc.MaxPowerGain = 60;
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
 
 % MessageBits
-resend = 1;
+resend = 10;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -83,11 +79,11 @@ seq = max(0, seq); %%make barker bits between 0 and 1
 %% CRC Generation
 crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 CRCtxBits = [int2bit(msgSet, 7); int2bit(Number, Number_size);]; %CRC frame
-CRCtxData = crcGen(CRCtxBits)
+CRCtxOut = crcGen(CRCtxBits)
 
 %% hamming encoding
-
-k = size(CRCtxData, 1)
+HammingTxIn = CRCtxOut;
+k = size(HammingTxIn, 1)
 r = ceil(log2(k))
 % Adjust r until the condition is met: 2^r >= k + r + 1
 while 2^r < k + r + 1
@@ -97,15 +93,15 @@ end
 n = 2^r - 1
 k = n - r
 
-HammingCode = encode(CRCtxData, n, k, 'hamming/binary');
-HammingTxCode = [HammingCode; zeros(1,1);]
+HammingTxOut = encode(HammingTxIn, n, k, 'hamming/binary');
 
 %% Trells encoding, Veterbi
-TrellisTxIn = HammingTxCode;
+
+TrellisTxIn = [HammingTxOut; zeros(1,1);];
 trellis = poly2trellis([4 3],[4 5 17;7 4 2]);
 tbdepth = 5 * 3; % A common practice for traceback depth
 
-TrellisTxOut = convenc(HammingTxCode,trellis);
+TrellisTxOut = convenc(TrellisTxIn,trellis);
 
 %%modulate, add noise and demodulate
 %modulatedSignal = qpskmod(code); % QPSK modulation
@@ -174,7 +170,7 @@ index = i-(L+1)/2; %dont know if this is correct
 sizeOfBarker = 13*2;
 startOfFrame = index+sizeOfBarker+1;
 
-endOfFrame = startOfFrame+size(CRCtxData, 1)-1;
+endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
 
 EOF = startOfFrame+size(TrellisTxOut, 1)-1;
 FrameDataOut = rxData(startOfFrame:EOF);
@@ -189,16 +185,16 @@ TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last 
 %HammingDecData = mod(HammingDecData + errLoc',2);
 
 %calculation
-HammingRxData = TrellsRxOut(1:size(HammingCode, 1)); %get data
+HammingRxIn = TrellsRxOut(1:size(HammingTxOut, 1)); %get data
 
-DetectedRxData = decode(HammingRxData,n,k,'hamming/binary');
-DetectedRxData = DetectedRxData(1:size(CRCtxData, 1));
+DetectedRxData = decode(HammingRxIn,n,k,'hamming/binary');
+HammingRxOut = DetectedRxData(1:size(CRCtxOut, 1));
 
 %% CRC check
 % Create a CRC detector with the same settings as the generator
 crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 % Check the received data for CRC errors
-[detectedData, errFlag] = crcDet(DetectedRxData);
+[detectedData, errFlag] = crcDet(HammingRxOut);
 
 %% reshape bits
 % Extract the message bits after the Barker codes
@@ -219,37 +215,42 @@ rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
-if(isequal(TrellsRxOut ,HammingTxCode))
+if(isequal(TrellsRxOut ,TrellisTxIn))
     disp('Trellis OK');
 else
     disp('Trellis not equeal to input');
 end
 errors = biterr(TrellisTxOut, TrellsRxIn, [], 'column-wise');
 errorRate = errors/size(TrellisTxOut, 1);
-formatSpec = 'Before Trells, error on %2d out of %2d bits = %.5f\n';
+formatSpec = 'Before  Trells, error on %2d out of %2d bits = %.5f\n';
 fprintf(formatSpec,errors, size(TrellisTxOut, 1), errorRate);
 
 errors = biterr(TrellisTxIn, TrellsRxOut, [], 'column-wise');
 errorRate = errors/size(TrellisTxIn, 1);
-formatSpec = 'After  Trells, error on %2d out of %2d bits = %.5f\n';
+formatSpec = 'After   Trells, error on %2d out of %2d bits = %.5f\n\n';
 fprintf(formatSpec,errors, size(TrellisTxIn, 1), errorRate);
 
 %------------------------------------------------------
-errors = biterr(HammingRxData, HammingCode, [], 'column-wise');
-errorRate = errors/size(HammingCode, 1);
+if(isequal(HammingTxIn ,HammingRxOut))
+    disp('Hamming OK');
+else
+    disp('Hamming not equeal to input');
+end
+errors = biterr(HammingRxIn, HammingTxOut, [], 'column-wise');
+errorRate = errors/size(HammingTxOut, 1);
 formatSpec = 'Before Hamming, error on %2d out of %2d bits = %.5f\n';
-fprintf(formatSpec,errors, size(HammingCode, 1), errorRate);
+fprintf(formatSpec,errors, size(HammingTxOut, 1), errorRate);
 
-errors = biterr(CRCtxData, DetectedRxData, [], 'column-wise');
-errorRate = errors/size(DetectedRxData, 1);
-formatSpec = 'After  Hamming, error on %2d out of %2d bits = %.5f\n';
-fprintf(formatSpec,errors, size(DetectedRxData, 1), errorRate);
+errors = biterr(HammingRxOut, HammingTxIn, [], 'column-wise');
+errorRate = errors/size(HammingRxOut, 1);
+formatSpec = 'After  Hamming, error on %2d out of %2d bits = %.5f\n\n';
+fprintf(formatSpec,errors, size(HammingRxOut, 1), errorRate);
 
 %------------------------------------------------------
 if(errFlag)
-    disp('CRC ERROR');
+    fprintf('CRC ERROR\n\n');
 else
-    disp('CRC OK');
+    fprintf('CRC OK\n\n');
 end
 
 %% Print data recived
@@ -262,4 +263,3 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram3(coarseFreq)
 %constDiagram4(synchronizedCarrier)
 %%constDiagram5(synchronizedSymbol) %dont know what this is
-
