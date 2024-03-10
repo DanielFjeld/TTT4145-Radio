@@ -9,7 +9,7 @@ rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
-tx = sdrtx('Pluto','Gain',-30);
+tx = sdrtx('Pluto','Gain',0);
 tx.CenterFrequency = 916e6;
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
@@ -65,17 +65,20 @@ for msgCnt = 0 : 99
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
         sprintf('%s %03d\n', Message, msgCnt);
 end
-barkerSeq = [1;1;1;1;1;0;0;1;1;0;1;0;1];
+barkerSeq = [0;0;0;0;0;1;1;0;0;1;0;1;0];
 barkerCode = [barkerSeq; barkerSeq];
 %msgtest = int2bit(msgSet, 7);
-MessageBits = [barkerCode ; int2bit(msgSet, 7)];
+MessageBits = [zeros(1000, 1) ; barkerCode ; int2bit(msgSet, 7)];
 
 
 
 
 % ---- Sender ----
 modSig = qpskmod(MessageBits);
+padding = zeros(100, 1);
+padSig = [padding; modSig; padding;]; %make signal imaginary
 txData = txfilter(modSig);
+
 tx.transmitRepeat(txData);
 
 % ---- Channel ----
@@ -93,14 +96,19 @@ synchronizedCarrier = carrierSynchronizer(synchronizedSymbol);
 
 rxData = qpskdemod(synchronizedCarrier);
 
-% ---- Error calculation ----
+%% ---- Error calculation ----
 %errorStats = errorRate(MessageBits,rxData);
 %fprintf("Errors: %d\n", errorStats(1));
 
-% ---- Data decoding ----
+%% ---- Data decoding ----
 %charSet = int8(bit2int(rxData, 1));
 %fprintf('%s', char(charSet));
-temp = rxData([27:end]);
+
+PreambleDetector = comm.PreambleDetector(barkerSeq,"Input","Bit");
+
+preambleIndex = PreambleDetector(rxData)+14
+
+temp = rxData([preambleIndex:(preambleIndex+5*(16*7)-1)]);
 result = char(bit2int(temp,7));
 strings_2D = reshape(result, 16, [])';
 % Convert the 2D matrix into a cell array of strings
@@ -108,12 +116,12 @@ strings_cell = cellstr(strings_2D);
 
 disp(strings_cell);
 
-constDiagram1(txData)
+%constDiagram1(txData)
 %constDiagram2(agcData)
 %constDiagram3(filteredData)
 %constDiagram4(compensatedData)
 %constDiagram5(synchronizedSymbol)
-constDiagram5(synchronizedCarrier)
+%constDiagram5(synchronizedCarrier)
 
 release(tx);
 release(rx);

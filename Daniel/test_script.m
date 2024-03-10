@@ -8,7 +8,7 @@ Message = '420';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
 
-Simulate = true;
+Simulate = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
@@ -19,7 +19,7 @@ rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
-tx = sdrtx('Pluto','Gain', -30);
+tx = sdrtx('Pluto','Gain', 0);
 tx.CenterFrequency = 916e6;
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
@@ -63,7 +63,7 @@ agc.MaxPowerGain = 60;
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
 
 % MessageBits
-resend = 1;
+resend = 10;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -267,6 +267,8 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
+release(tx);
+release(rx);
 
 %% creating functions test
 [y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
