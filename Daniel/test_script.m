@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'Test ';
+Message = '420';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
 
@@ -38,7 +38,7 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
     'FrequencyOffset',1e3, ...
@@ -124,7 +124,7 @@ frameTxOut = MessageBits; %frame
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 padding = zeros(100, 1);
-modSig = [padding; msg; padding;padding; msg; padding;] %make signal imaginary
+modSig = [padding; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
