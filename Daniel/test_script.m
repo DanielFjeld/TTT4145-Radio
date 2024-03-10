@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'N';
+Message = 'Test ';
 Number_size = 8; %int8_t
 Number = [69]; %number to be sent
 
@@ -19,7 +19,7 @@ rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
-tx = sdrtx('Pluto','Gain', -0);
+tx = sdrtx('Pluto','Gain', -30);
 tx.CenterFrequency = 916e6;
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
@@ -27,18 +27,18 @@ rx.SamplesPerFrame = 11226;
 
 %% Constellation diagrams
 constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','txData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000,'Title','txData');
 constDiagram2 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','filteredData');
 constDiagram3 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','agcData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000,'Title','agcData');
 constDiagram4 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',10000);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',10);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',2,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
     'FrequencyOffset',1e3, ...
@@ -59,12 +59,11 @@ agc.DesiredOutputPower = 2;
 agc.AveragingLength = 50;
 agc.MaxPowerGain = 60;
 
-
 %% create frame
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
 
 % MessageBits
-resend = 10;
+resend = 1;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -74,24 +73,25 @@ seq = barker();
 seq = max(0, seq); %%make barker bits between 0 and 1 
 %seq = int2bit(seq, 2);
 
-
+MsgTxOut = msgSet;
 
 %% CRC Generation
+CRCtxIn = MsgTxOut;
 crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
-CRCtxBits = [int2bit(msgSet, 7); int2bit(Number, Number_size);]; %CRC frame
-CRCtxOut = crcGen(CRCtxBits)
+CRCtxBits = [int2bit(CRCtxIn, 7); int2bit(Number, Number_size);]; %CRC frame
+CRCtxOut = crcGen(CRCtxBits);
 
 %% hamming encoding
 HammingTxIn = CRCtxOut;
-k = size(HammingTxIn, 1)
-r = ceil(log2(k))
+k = size(HammingTxIn, 1);
+r = ceil(log2(k));
 % Adjust r until the condition is met: 2^r >= k + r + 1
 while 2^r < k + r + 1
     r = r + 1;
 end
 % Calculate the total codeword length n
-n = 2^r - 1
-k = n - r
+n = 2^r - 1;
+k = n - r;
 
 HammingTxOut = encode(HammingTxIn, n, k, 'hamming/binary');
 
@@ -112,22 +112,22 @@ TrellisTxOut = convenc(TrellisTxIn,trellis);
 
 %% frame 
 frameTxIn = TrellisTxOut;
-zero = zeros(1000, 1);
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
     MessageBits = [seq; seq; frameTxIn;]; 
 end
 
-
-Zero_padding = [zero; MessageBits; zero;]; %frame
-
-
+frameTxOut = MessageBits; %frame
 
 %% modululate from real to imaginary numbers
+modulateTxIn = frameTxOut;
+msg = qpskmod(modulateTxIn);
+padding = zeros(100, 1);
+modSig = [padding; msg; padding;padding; msg; padding;] %make signal imaginary
 
-modSig = qpskmod(Zero_padding); %make signal imaginary
 txData = txfilter(modSig); %lp filter (make transitions smooth)
+
 rxSig = 0;
 
 %% transmitt data
@@ -152,15 +152,16 @@ end
 
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
-synchronizedSymbol = symbolSynchronizer(synchronizedCarrier);
+synchronizedSymbol = symbolSynchronizer(coarseFreq);
 rxData = qpskdemod(synchronizedCarrier); %generate bits from const diagram
 %find start of frame
 
 %% detect frame start
+FrameDetectIn = rxData;
 bar = barker();
 barkerPreamble = [bar; bar;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
-corr = xcorr(rxData, barkerPreamble);
+corr = xcorr(FrameDetectIn, barkerPreamble);
 L = length(corr);
 [v,i] = max(corr); %i = start of index
 
@@ -173,10 +174,10 @@ startOfFrame = index+sizeOfBarker+1;
 endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
 
 EOF = startOfFrame+size(TrellisTxOut, 1)-1;
-FrameDataOut = rxData(startOfFrame:EOF);
+FrameDetectOut = FrameDetectIn(startOfFrame:EOF);
 
 %% Trells decoding, Veterbi
-TrellsRxIn = FrameDataOut
+TrellsRxIn = FrameDetectOut;
 TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
 
 %% hamming decoding
@@ -191,15 +192,17 @@ DetectedRxData = decode(HammingRxIn,n,k,'hamming/binary');
 HammingRxOut = DetectedRxData(1:size(CRCtxOut, 1));
 
 %% CRC check
+CRCrxIn = HammingRxOut;
 % Create a CRC detector with the same settings as the generator
 crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 % Check the received data for CRC errors
-[detectedData, errFlag] = crcDet(HammingRxOut);
+[detectedData, errFlag] = crcDet(CRCrxIn);
 
 %% reshape bits
 % Extract the message bits after the Barker codes
+reshapeRxIn = detectedData;
 endOfMessage = MessageLength*7*resend;
-messageBits = DetectedRxData(1:endOfMessage);
+messageBits = reshapeRxIn(1:endOfMessage);
 
 % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
 % This might need adjustment based on how the bits are packed and the total length
@@ -208,7 +211,7 @@ messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remov
 % Convert each 7-bit group to a character
 decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
 
-%% Extract number
+%%Extract number
 number_index_start = endOfMessage+1;
 number_index_stop = number_index_start+Number_size-1;
 rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
@@ -262,4 +265,32 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
 %constDiagram4(synchronizedCarrier)
-%%constDiagram5(synchronizedSymbol) %dont know what this is
+%constDiagram5(synchronizedSymbol) %dont know what this is
+
+
+%% creating functions test
+[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
+formatSpec = '%s%d\n';
+%fprintf(formatSpec, y, x);
+
+function [y, x] = test(reshapeRxIn, MessageLength, Number_size)
+% Extract the message bits after the Barker codes
+endOfMessage = MessageLength*7;
+messageBits = reshapeRxIn(1:endOfMessage);
+
+% Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
+% This might need adjustment based on how the bits are packed and the total length
+messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remove ; and add '
+
+% Convert each 7-bit group to a character
+decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
+
+%%Extract number
+number_index_start = endOfMessage+1;
+number_index_stop = number_index_start+Number_size-1;
+rx_number_bits = reshapeRxIn(number_index_start:number_index_stop);
+rx_number = bit2int(rx_number_bits,Number_size);
+y = decodedMessage;
+x = rx_number;
+
+end
