@@ -115,3 +115,5 @@ constDiagram1(txData)
 %constDiagram5(synchronizedSymbol)
 constDiagram5(synchronizedCarrier)
 
+release(tx);
+release(rx);
