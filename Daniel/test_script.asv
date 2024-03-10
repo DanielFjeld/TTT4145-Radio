@@ -115,12 +115,12 @@ TrellisTxOut = convenc(HammingTxCode,trellis);
 %softBits = qpskdemod(receivedSignal);
 
 %% frame 
-frameTxIn = TrellisTxOut;
+frameTxIn
 zero = zeros(1000, 1);
-if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
+if(mod(size(VeterbiTxOut,1),2) == 1)%must be integer multiple of bits per symbol (2)
+    MessageBits = [seq; seq; VeterbiTxOut; zeros(1, 1);]; %need to add a zero at the end
 else
-    MessageBits = [seq; seq; frameTxIn;]; 
+    MessageBits = [seq; seq; VeterbiTxOut;]; 
 end
 
 
@@ -176,7 +176,7 @@ startOfFrame = index+sizeOfBarker+1;
 
 endOfFrame = startOfFrame+size(CRCtxData, 1)-1;
 
-EOF = startOfFrame+size(TrellisTxOut, 1)-1;
+EOF = startOfFrame+size(VeterbiTxOut, 1)-1;
 FrameDataOut = rxData(startOfFrame:EOF);
 
 %% Trells decoding, Veterbi
@@ -224,12 +224,12 @@ if(isequal(TrellsRxOut ,HammingTxCode))
 else
     disp('Trellis not equeal to input');
 end
-errors = biterr(TrellisTxOut, TrellsRxIn, [], 'column-wise');
-errorRate = errors/size(TrellisTxOut, 1);
+errors = biterr(VeterbiTxOut, TrellsRxIn, [], 'column-wise');
+errorRate = errors/size(VeterbiTxOut, 1);
 formatSpec = 'Before Trells, error on %2d out of %2d bits = %.5f\n';
-fprintf(formatSpec,errors, size(TrellisTxOut, 1), errorRate);
+fprintf(formatSpec,errors, size(VeterbiTxOut, 1), errorRate);
 
-errors = biterr(TrellisTxIn, TrellsRxOut, [], 'column-wise');
+errors = biterr(TrellisTxIn, TrellisTxOut, [], 'column-wise');
 errorRate = errors/size(TrellisTxIn, 1);
 formatSpec = 'After  Trells, error on %2d out of %2d bits = %.5f\n';
 fprintf(formatSpec,errors, size(TrellisTxIn, 1), errorRate);
