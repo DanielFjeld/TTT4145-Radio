@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'Hello';
+Message = 'Heiiii';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -187,6 +187,7 @@ FrameDetectIn = rxOut;
 corr = xcorr(ImRxOut, ImPreamble);
 L = length(corr);
 [v,i] = max(corr); %i = start of index
+amp = abs(v)
 preambleIndex = i*2-L + 51%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
@@ -286,7 +287,7 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 release(tx);
