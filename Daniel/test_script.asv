@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'Hello';
+Message = 'abcdefghijklmnop';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -40,9 +40,9 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',200,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
-    'PhaseOffset',40, ...
+    'PhaseOffset',90, ...
     'FrequencyOffset',1e3, ...
     'SampleRate',1e6);
 
@@ -77,7 +77,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 % MessageBits
-resend = 50;
+resend = 1;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -137,8 +137,8 @@ frameTxOut = MessageBits; %frame
 %% modululate from real to imaginary numbers and add preamble
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
-ImPreamble = Preamble+Preamble*i
-padding = zeros(160, 1);
+ImPreamble = Preamble+Preamble*i;
+padding = zeros(200, 1);
 modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
@@ -172,36 +172,34 @@ synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 %synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
 ImRxOut = synchronizedCarrier;
-rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
+
 %find start of frame
 
-%% detect frame start
-FrameDetectIn = rxOut;
-%bar = barker();
-%barkerPreamble = [bar; bar;];
-% Perform cross-correlation between the noisy signal and the Barker sequence
-%pre = ImRxOut
-%PreambleDetector = comm.PreambleDetector(ImPreamble, Input="Symbol",Threshold=16, Detections="All");
-%preambleIndex = PreambleDetector(FrameDetectIn) - 70
-
-corr = xcorr(ImRxOut, ImPreamble);
+%% detect frame start and phase offset
+corr = xcorr(ImRxOut, ImPreamble); %%do correlation
 L = length(corr);
 [v,i] = max(corr); %i = start of index
-preambleIndex = i*2-L + 51%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
+
+%get amplitude and angle of correlation
+amp = abs(v)
+theta = atan2(imag(v),real(v))*180/pi
+
+%apply offset
+phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=theta);
 
 
-sizeOfBarker = 13*2;
-startOfFrame = preambleIndex+1;
+preambleIndex = (i-(L+1)/2)+1 + 26 %find start of preamble
+phaseTxOut = ImRxOut((preambleIndex):size(ImRxOut, 1)); %set start of data
 
-endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
+rxOut = qpskdemod(phaseTxOut); %generate bits from const diagram
+rxOut = rxOut(1:end);
 
-EOF = startOfFrame+size(TrellisTxOut, 1)-1;
-FrameDetectOut = FrameDetectIn(startOfFrame:EOF);
+EOF = size(TrellisTxOut, 1);
+FrameDetectOut = rxOut(1:EOF);
 
 %% Trells decoding, Veterbi
 TrellsRxIn = FrameDetectOut;
 TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
-
 %% hamming decoding
 %%introduse error
 %errLoc = randerr(1,n);
