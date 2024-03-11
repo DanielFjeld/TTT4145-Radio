@@ -54,8 +54,18 @@ classdef QPSKBitsGenerator < matlab.System
             % Generate message binaries from signal source.
             msgBin = obj.pSigSrc();
             
+            %crc 
+            %crcgenerator = comm.CRCGenerator([1 0 0 1],'ChecksumsPerFrame',2);
+            %codeword = crcgenerator(msgBin);
+
+            %crcdetector = comm.CRCDetector([1 0 0 1],'ChecksumsPerFrame',2);
+            %[~, err] = crcdetector(codeword)
+
+            %fprintf('%d\n', err);
+
             % Scramble the data
             scrambledMsg = obj.pScrambler(msgBin);
+
             
             % Append the scrambled bit sequence to the header
             y = [obj.pHeader ; scrambledMsg];

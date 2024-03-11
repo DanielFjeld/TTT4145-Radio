@@ -4,14 +4,16 @@
 clear all;
 
 %% Parameters
-Message = 't';
+Message = 'Hello ';
 Number_size = 8; %int8_t
-Number = [69]; %number to be sent
+Number = 69; %number to be sent
 
 Simulate = true;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
+
+
 
 %% Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -19,7 +21,7 @@ rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
-tx = sdrtx('Pluto','Gain', -0);
+tx = sdrtx('Pluto','Gain', 0);
 tx.CenterFrequency = 916e6;
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
@@ -31,14 +33,14 @@ constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
 constDiagram2 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','filteredData');
 constDiagram3 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','agcData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000,'Title','agcData');
 constDiagram4 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',300000);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',2,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
     'FrequencyOffset',1e3, ...
@@ -61,6 +63,8 @@ agc.MaxPowerGain = 60;
 
 %% create frame
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
+bar = barker();
+Preamble = [bar; bar;];
 
 % MessageBits
 resend = 1;
@@ -112,20 +116,20 @@ TrellisTxOut = convenc(TrellisTxIn,trellis);
 
 %% frame 
 frameTxIn = TrellisTxOut;
-zero = zeros(1000, 1);
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
     MessageBits = [seq; seq; frameTxIn;]; 
 end
 
-
 frameTxOut = MessageBits; %frame
 
 %% modululate from real to imaginary numbers
 modulateTxIn = frameTxOut;
-x = zeros(100, 1);
-modSig = [x; qpskmod(modulateTxIn); x;] %make signal imaginary
+msg = qpskmod(modulateTxIn);
+ImPreamble = Preamble+Preamble*i
+padding = zeros(140, 1);
+modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -153,24 +157,29 @@ end
 
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
-synchronizedSymbol = symbolSynchronizer(synchronizedCarrier);
-rxData = qpskdemod(synchronizedCarrier); %generate bits from const diagram
+synchronizedSymbol = symbolSynchronizer(coarseFreq);
+
+ImRxOut = synchronizedCarrier;
+rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
 %find start of frame
 
 %% detect frame start
-FrameDetectIn = rxData;
+FrameDetectIn = rxOut;
 bar = barker();
-barkerPreamble = [bar; bar;];
+barkerPreamble = [seq; seq;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
-corr = xcorr(FrameDetectIn, barkerPreamble);
-L = length(corr);
-[v,i] = max(corr); %i = start of index
+corr = xcorr(ImRxOut, ImPreamble);
 
-index = i-(L+1)/2; %dont know if this is correct
+PreambleDetector = comm.PreambleDetector(barkerPreamble,"Input","Bit");
+preambleIndex = PreambleDetector(FrameDetectIn)
+
+L = length(corr)
+[v,i] = max(corr) %i = start of index
+preambleIndex = i*2-L + 77%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
 sizeOfBarker = 13*2;
-startOfFrame = index+sizeOfBarker+1;
+startOfFrame = preambleIndex+1;
 
 endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
 
@@ -265,15 +274,16 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
-%%constDiagram5(synchronizedSymbol) %dont know what this is
+%constDiagram4(synchronizedCarrier)
+%constDiagram5(synchronizedSymbol) %dont know what this is
 
+release(tx);
+release(rx);
 
 %% creating functions test
-formatSpec = 'Test: %s\n\n';
 [y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
 formatSpec = '%s%d\n';
-fprintf(formatSpec, y, x);
+%fprintf(formatSpec, y, x);
 
 function [y, x] = test(reshapeRxIn, MessageLength, Number_size)
 % Extract the message bits after the Barker codes

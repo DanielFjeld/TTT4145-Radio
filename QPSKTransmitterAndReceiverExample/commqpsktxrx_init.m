@@ -17,10 +17,10 @@ SimParams.TotalFrame = 1000;        % Simulate 1000 frames in total
 SimParams.BarkerCode      = [+1 +1 +1 +1 +1 -1 -1 +1 +1 -1 +1 -1 +1];     % Bipolar Barker Code
 SimParams.BarkerLength    = length(SimParams.BarkerCode);
 SimParams.HeaderLength    = SimParams.BarkerLength * 2;                   % Duplicate 2 Barker codes to be as a header
-SimParams.Message         = 'Hello world';
-SimParams.MessageLength   = strlength(SimParams.Message) + 5;                % 'Hello world 000\n'...
-SimParams.NumberOfMessage = 20;                                           % Number of messages in a frame
-SimParams.PayloadLength   = SimParams.NumberOfMessage * SimParams.MessageLength * 7; % 7 bits per characters
+SimParams.Message         = '';
+SimParams.MessageLength   = 5;                % 'Hello world 000\n'...
+SimParams.NumberOfMessage = 2;                                           % Number of messages in a frame
+SimParams.PayloadLength   = SimParams.NumberOfMessage * SimParams.MessageLength * 7; % 7 bits per characters, 6bit CRC
 SimParams.FrameSize       = (SimParams.HeaderLength + SimParams.PayloadLength) ...
     / log2(SimParams.ModulationOrder);                                    % Frame size in symbols
 SimParams.FrameTime       = SimParams.Tsym*SimParams.FrameSize;

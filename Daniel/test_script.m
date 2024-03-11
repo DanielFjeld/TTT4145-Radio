@@ -4,14 +4,16 @@
 clear all;
 
 %% Parameters
-Message = '420';
+Message = 'Hello ';
 Number_size = 8; %int8_t
-Number = [69]; %number to be sent
+Number = 69; %number to be sent
 
-Simulate = false;
+Simulate = true;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
+
+
 
 %% Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -61,9 +63,11 @@ agc.MaxPowerGain = 60;
 
 %% create frame
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
+bar = barker();
+Preamble = [bar; bar;];
 
 % MessageBits
-resend = 10;
+resend = 1;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -123,8 +127,9 @@ frameTxOut = MessageBits; %frame
 %% modululate from real to imaginary numbers
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
-padding = zeros(100, 1);
-modSig = [padding; msg; padding;]; %make signal imaginary
+ImPreamble = Preamble+Preamble*i
+padding = zeros(160, 1);
+modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -153,23 +158,28 @@ end
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
-rxData = qpskdemod(synchronizedCarrier); %generate bits from const diagram
+
+ImRxOut = synchronizedCarrier;
+rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
 %find start of frame
 
 %% detect frame start
-FrameDetectIn = rxData;
+FrameDetectIn = rxOut;
 bar = barker();
-barkerPreamble = [bar; bar;];
+barkerPreamble = [seq; seq;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
-corr = xcorr(FrameDetectIn, barkerPreamble);
-L = length(corr);
-[v,i] = max(corr); %i = start of index
+corr = xcorr(ImRxOut, ImPreamble);
 
-index = i-(L+1)/2; %dont know if this is correct
+PreambleDetector = comm.PreambleDetector(barkerPreamble,"Input","Bit");
+preambleIndex = PreambleDetector(FrameDetectIn)
+
+L = length(corr)
+[v,i] = max(corr) %i = start of index
+preambleIndex = i*2-L + 77%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
 sizeOfBarker = 13*2;
-startOfFrame = index+sizeOfBarker+1;
+startOfFrame = preambleIndex+1;
 
 endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
 
