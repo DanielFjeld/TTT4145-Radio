@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'Hello ';
+Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -40,7 +40,7 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',30,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
     'FrequencyOffset',1e3, ...
@@ -49,12 +49,23 @@ pfo = comm.PhaseFrequencyOffset( ...
 %% Instantiate communication toolbox blocks
 qpskmod = comm.QPSKModulator('BitInput',true);
 qpskdemod = comm.QPSKDemodulator('BitOutput',true);
+
 coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
 symbolSynchronizer = comm.SymbolSynchronizer("Modulation","PAM/PSK/QAM","SamplesPerSymbol",SamplesPerSymbol);
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol, ...
     'DecimationFactor',12,RolloffFactor=0.5);
+
+
+coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+
+%txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+%rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, ...
+%           RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+
 errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
 agc.DesiredOutputPower = 2;
@@ -67,7 +78,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 % MessageBits
-resend = 1;
+resend = 50;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -124,7 +135,7 @@ end
 
 frameTxOut = MessageBits; %frame
 
-%% modululate from real to imaginary numbers
+%% modululate from real to imaginary numbers and add preamble
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i
@@ -156,8 +167,10 @@ else
 end
 
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
-synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
+
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
+synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
+%synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
 ImRxOut = synchronizedCarrier;
 rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
@@ -165,14 +178,12 @@ rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
 
 %% detect frame start
 FrameDetectIn = rxOut;
-bar = barker();
-barkerPreamble = [bar; bar;];
+%bar = barker();
+%barkerPreamble = [bar; bar;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
-pre = ImRxOut
-
-PreambleDetector = comm.PreambleDetector(ImPreamble, Input="Symbol",Threshold=16);
-preambleIndex = PreambleDetector(FrameDetectIn)
-preambleIndex = 
+%pre = ImRxOut
+%PreambleDetector = comm.PreambleDetector(ImPreamble, Input="Symbol",Threshold=16, Detections="All");
+%preambleIndex = PreambleDetector(FrameDetectIn) - 70
 
 corr = xcorr(ImRxOut, ImPreamble);
 L = length(corr)
@@ -273,11 +284,11 @@ formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
 
 %% print diagrams
-%constDiagram1(txData)
-%constDiagram2(filteredData)
-%constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
-%constDiagram5(synchronizedSymbol) %dont know what this is
+constDiagram1(txData)
+constDiagram2(filteredData)
+constDiagram3(coarseFreq)
+constDiagram4(synchronizedCarrier)
+constDiagram5(synchronizedSymbol) %dont know what this is
 
 release(tx);
 release(rx);

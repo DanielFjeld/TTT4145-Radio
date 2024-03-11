@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'L';
+Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -49,12 +49,22 @@ pfo = comm.PhaseFrequencyOffset( ...
 %% Instantiate communication toolbox blocks
 qpskmod = comm.QPSKModulator('BitInput',true);
 qpskdemod = comm.QPSKDemodulator('BitOutput',true);
+
 coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
 symbolSynchronizer = comm.SymbolSynchronizer("Modulation","PAM/PSK/QAM","SamplesPerSymbol",SamplesPerSymbol);
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol, ...
     'DecimationFactor',12,RolloffFactor=0.5);
+
+
+coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+
+%txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+%rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+
 errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
 agc.DesiredOutputPower = 2;
@@ -67,7 +77,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 % MessageBits
-resend = 1;
+resend = 50;
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -124,7 +134,7 @@ end
 
 frameTxOut = MessageBits; %frame
 
-%% modululate from real to imaginary numbers
+%% modululate from real to imaginary numbers and add preamble
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i
@@ -156,8 +166,10 @@ else
 end
 
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
-synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
+
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
+synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
+%synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
 ImRxOut = synchronizedCarrier;
 rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
@@ -173,8 +185,8 @@ FrameDetectIn = rxOut;
 %preambleIndex = PreambleDetector(FrameDetectIn) - 70
 
 corr = xcorr(ImRxOut, ImPreamble);
-L = length(corr)
-[v,i] = max(corr) %i = start of index
+L = length(corr);
+[v,i] = max(corr); %i = start of index
 preambleIndex = i*2-L + 51%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
@@ -274,7 +286,7 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
+constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 release(tx);
