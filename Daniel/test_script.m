@@ -4,7 +4,8 @@
 clear all;
 
 %% Parameters
-Message = 'abcdefghijklmnop';
+resend = 1;
+Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -40,9 +41,9 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',20,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
-    'PhaseOffset',180, ...
+    'PhaseOffset',70, ...
     'FrequencyOffset',1e3, ...
     'SampleRate',1e6);
 
@@ -50,9 +51,6 @@ pfo = comm.PhaseFrequencyOffset( ...
 qpskmod = comm.QPSKModulator('BitInput',true);
 qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
-coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
-symbolSynchronizer = comm.SymbolSynchronizer("Modulation","PAM/PSK/QAM","SamplesPerSymbol",SamplesPerSymbol);
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol, ...
     'DecimationFactor',12,RolloffFactor=0.5);
@@ -65,7 +63,7 @@ carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPh
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
-errorRate = comm.ErrorRate('ReceiveDelay',2);
+%errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
 agc.DesiredOutputPower = 2;
 agc.AveragingLength = 50;
@@ -77,7 +75,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 % MessageBits
-resend = 100;
+
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -129,7 +127,7 @@ frameTxIn = TrellisTxOut;
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     MessageBits = [frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
-    MessageBits = [frameTxIn;]; 
+    MessageBits = frameTxIn; 
 end
 
 frameTxOut = MessageBits; %frame
@@ -285,7 +283,7 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 release(tx);
