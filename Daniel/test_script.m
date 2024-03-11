@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-Message = 'Hello ';
+Message = 'L';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -40,7 +40,7 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
     'PhaseOffset',40, ...
     'FrequencyOffset',1e3, ...
@@ -117,9 +117,9 @@ TrellisTxOut = convenc(TrellisTxIn,trellis);
 %% frame 
 frameTxIn = TrellisTxOut;
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
+    MessageBits = [frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
-    MessageBits = [seq; seq; frameTxIn;]; 
+    MessageBits = [frameTxIn;]; 
 end
 
 frameTxOut = MessageBits; %frame
@@ -165,17 +165,17 @@ rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
 
 %% detect frame start
 FrameDetectIn = rxOut;
-bar = barker();
-barkerPreamble = [seq; seq;];
+%bar = barker();
+%barkerPreamble = [bar; bar;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
+%pre = ImRxOut
+%PreambleDetector = comm.PreambleDetector(ImPreamble, Input="Symbol",Threshold=16, Detections="All");
+%preambleIndex = PreambleDetector(FrameDetectIn) - 70
+
 corr = xcorr(ImRxOut, ImPreamble);
-
-PreambleDetector = comm.PreambleDetector(barkerPreamble,"Input","Bit");
-preambleIndex = PreambleDetector(FrameDetectIn)
-
 L = length(corr)
 [v,i] = max(corr) %i = start of index
-preambleIndex = i*2-L + 77%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
+preambleIndex = i*2-L + 51%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
 sizeOfBarker = 13*2;

@@ -117,9 +117,9 @@ TrellisTxOut = convenc(TrellisTxIn,trellis);
 %% frame 
 frameTxIn = TrellisTxOut;
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
+    MessageBits = [frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
-    MessageBits = [seq; seq; frameTxIn;]; 
+    MessageBits = [frameTxIn;]; 
 end
 
 frameTxOut = MessageBits; %frame
@@ -128,7 +128,7 @@ frameTxOut = MessageBits; %frame
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i
-padding = zeros(140, 1);
+padding = zeros(160, 1);
 modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
@@ -166,16 +166,18 @@ rxOut = qpskdemod(ImRxOut); %generate bits from const diagram
 %% detect frame start
 FrameDetectIn = rxOut;
 bar = barker();
-barkerPreamble = [seq; seq;];
+barkerPreamble = [bar; bar;];
 % Perform cross-correlation between the noisy signal and the Barker sequence
-corr = xcorr(ImRxOut, ImPreamble);
+pre = ImRxOut
 
-PreambleDetector = comm.PreambleDetector(barkerPreamble,"Input","Bit");
+PreambleDetector = comm.PreambleDetector(ImPreamble, Input="Symbol",Threshold=16);
 preambleIndex = PreambleDetector(FrameDetectIn)
+preambleIndex = 
 
+corr = xcorr(ImRxOut, ImPreamble);
 L = length(corr)
 [v,i] = max(corr) %i = start of index
-preambleIndex = i*2-L + 77%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
+preambleIndex = i*2-L + 51%L-i + 74 %i-(L+1)/2 %dont know if this is correct %want 298
 
 
 sizeOfBarker = 13*2;
