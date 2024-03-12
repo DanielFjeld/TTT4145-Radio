@@ -48,8 +48,8 @@ classdef (StrictDefaults)QPSKReceiver < matlab.System
     properties (Access = private, Constant)
         pUpdatePeriod = 4 % Defines the size of vector that will be processed in AGC system object
         pModulatedHeader = sqrt(2)/2 * (-1-1i) * [+1; +1; +1; +1; +1; -1; -1; +1; +1; -1; +1; -1; +1];
-        pMessage = 'Hello world';
-        pMessageLength = 16;
+        pMessage = 'ABCD';
+        pMessageLength = 9;
     end
     
     methods

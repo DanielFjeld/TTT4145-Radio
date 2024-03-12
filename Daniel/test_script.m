@@ -4,14 +4,17 @@
 clear all;
 
 %% Parameters
-Message = '420';
+resend = 1;
+Message = 'Hello';
 Number_size = 8; %int8_t
-Number = [69]; %number to be sent
+Number = 123; %number to be sent
 
 Simulate = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
+
+
 
 %% Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -38,22 +41,29 @@ constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
 
 %% Channel
-channel = comm.AWGNChannel('EbNo',5,'BitsPerSymbol',2);
+channel = comm.AWGNChannel('EbNo',10,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
-    'PhaseOffset',40, ...
+    'PhaseOffset',-180, ...
     'FrequencyOffset',1e3, ...
     'SampleRate',1e6);
 
 %% Instantiate communication toolbox blocks
 qpskmod = comm.QPSKModulator('BitInput',true);
 qpskdemod = comm.QPSKDemodulator('BitOutput',true);
-coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
-symbolSynchronizer = comm.SymbolSynchronizer("Modulation","PAM/PSK/QAM","SamplesPerSymbol",SamplesPerSymbol);
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","SamplesPerSymbol",SamplesPerSymbol);
+
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol, ...
     'DecimationFactor',12,RolloffFactor=0.5);
-errorRate = comm.ErrorRate('ReceiveDelay',2);
+
+
+coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+
+%txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+%rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+
+%errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
 agc.DesiredOutputPower = 2;
 agc.AveragingLength = 50;
@@ -61,9 +71,11 @@ agc.MaxPowerGain = 60;
 
 %% create frame
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
+bar = barker();
+Preamble = [bar; bar;];
 
 % MessageBits
-resend = 10;
+
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
@@ -113,18 +125,20 @@ TrellisTxOut = convenc(TrellisTxIn,trellis);
 %% frame 
 frameTxIn = TrellisTxOut;
 if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    MessageBits = [seq; seq; frameTxIn; zeros(1, 1);]; %need to add a zero at the end
+    MessageBits = [frameTxIn; zeros(1, 1);]; %need to add a zero at the end
 else
-    MessageBits = [seq; seq; frameTxIn;]; 
+    MessageBits = frameTxIn; 
 end
 
 frameTxOut = MessageBits; %frame
 
-%% modululate from real to imaginary numbers
+%% modululate from real to imaginary numbers and add preamble
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
-padding = zeros(100, 1);
-modSig = [padding; msg; padding;]; %make signal imaginary
+ImPreamble = Preamble+Preamble*i;
+padding1 = zeros(200, 1);
+padding2 = zeros(2000, 1);
+modSig = [padding1; ImPreamble; msg; padding2;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -143,43 +157,55 @@ end
 
 %% ---- Receiver ----
 
-%agcData = agc(rx());
+while(1)
+   
+agcData = agc(rx());
 if(Simulate == false)
     filteredData = rxfilter(rx());
 else
     filteredData = rxfilter(rxSig);
 end
-
+release(coarseFrequencyCompensator);
+release(coarseFrequencyCompensator);
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
+
+%synchronizedSymbol = symbolSynchronizer(coarseFreq);
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
-synchronizedSymbol = symbolSynchronizer(coarseFreq);
-rxData = qpskdemod(synchronizedCarrier); %generate bits from const diagram
+%synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
+
+ImRxOut = synchronizedCarrier;
+
 %find start of frame
 
-%% detect frame start
-FrameDetectIn = rxData;
-bar = barker();
-barkerPreamble = [bar; bar;];
-% Perform cross-correlation between the noisy signal and the Barker sequence
-corr = xcorr(FrameDetectIn, barkerPreamble);
+%% detect frame start and phase offset
+corr = xcorr(ImRxOut, ImPreamble); %%do correlation
 L = length(corr);
 [v,i] = max(corr); %i = start of index
 
-index = i-(L+1)/2; %dont know if this is correct
+%get amplitude and angle of correlation
+amp = abs(v);
+if(amp > 40)
+theta = atan2(imag(v),real(v))*180/pi+17; %dont know why barker is 17deg off data
+
+%apply offset
+phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
-sizeOfBarker = 13*2;
-startOfFrame = index+sizeOfBarker+1;
+preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
+if(preambleIndex < size(ImRxOut, 1))
+phaseTxOut = ImRxOut(preambleIndex:size(ImRxOut, 1)); %set start of data
+phaseTxOut = phaseOffset(phaseTxOut);
 
-endOfFrame = startOfFrame+size(CRCtxOut, 1)-1;
+rxOut = qpskdemod(phaseTxOut); %generate bits from const diagram
+rxOut = rxOut(1:end);
 
-EOF = startOfFrame+size(TrellisTxOut, 1)-1;
-FrameDetectOut = FrameDetectIn(startOfFrame:EOF);
+EOF = size(TrellisTxOut, 1);
+if(EOF <= size(rxOut,1))
+FrameDetectOut = rxOut(1:EOF);
 
 %% Trells decoding, Veterbi
 TrellsRxIn = FrameDetectOut;
 TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
-
 %% hamming decoding
 %%introduse error
 %errLoc = randerr(1,n);
@@ -218,6 +244,8 @@ rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
+if(0)
+
 if(isequal(TrellsRxOut ,TrellisTxIn))
     disp('Trellis OK');
 else
@@ -256,22 +284,30 @@ else
     fprintf('CRC OK\n\n');
 end
 
+
+
+end
+
 %% Print data recived
+if(errFlag);
+else
 formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
+end
 
 %% print diagrams
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
-%constDiagram5(synchronizedSymbol) %dont know what this is
-
-release(tx);
-release(rx);
+constDiagram4(synchronizedCarrier)
+constDiagram5(phaseTxOut) %dont know what this is
+end
+end
+end
+end
 
 %% creating functions test
-[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
+%%[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
 formatSpec = '%s%d\n';
 %fprintf(formatSpec, y, x);
 

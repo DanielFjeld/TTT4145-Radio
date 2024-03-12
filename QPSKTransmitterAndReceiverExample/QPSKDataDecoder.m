@@ -27,8 +27,8 @@ classdef QPSKDataDecoder < matlab.System
     properties (Constant, Access = private)
         pBarkerCode = [+1; +1; +1; +1; +1; -1; -1; +1; +1; -1; +1; -1; +1]; % Bipolar Barker Code
         pModulatedHeader = sqrt(2)/2 * (-1-1i) * QPSKDataDecoder.pBarkerCode;
-        pMessage = 'Hello world';
-        pMessageLength = 16;
+        pMessage = '';
+        pMessageLength = 5;
     end
     
     methods

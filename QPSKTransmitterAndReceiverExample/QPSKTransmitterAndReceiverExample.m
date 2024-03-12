@@ -35,6 +35,7 @@
 % <matlab:openExample('comm/QPSKTransmitterAndReceiverExample','supportingFile','commqpsktxrx_init.m') commqpsktxrx_init.m>
 % script initializes simulation parameters and generates the structure
 % prmQPSKTxRx.
+clear all;
 prmQPSKTxRx = commqpsktxrx_init %#ok<*NOPTS> % QPSK system parameters
 
 useScopes = true;          % true if scopes are to be used
