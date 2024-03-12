@@ -3,6 +3,8 @@
 % clear all, will clear persistant variables wich may be stuck after last compile
 clear all;
 
+
+
 %% Parameters
 resend = 1;
 Message = 'Hello';
@@ -14,7 +16,8 @@ Simulate = false;
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
 
-
+errors = 0;
+success = 1;
 
 %% Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -244,6 +247,9 @@ rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
+
+
+
 if(0)
 
 if(isequal(TrellsRxOut ,TrellisTxIn))
@@ -288,11 +294,17 @@ end
 
 end
 
+if(errFlag == 0)
+    success = success +1;
+else 
+    errors = errors +1;
+end
+
 %% Print data recived
 if(errFlag);
 else
-formatSpec = '%s%d\n';
-fprintf(formatSpec, decodedMessage, rx_number);
+formatSpec = '%d %d %s%d\n';
+fprintf(formatSpec, success , errors,  decodedMessage, rx_number);
 end
 
 %% print diagrams
@@ -301,6 +313,8 @@ end
 %constDiagram3(coarseFreq)
 constDiagram4(synchronizedCarrier)
 constDiagram5(phaseTxOut) %dont know what this is
+
+
 end
 end
 end
