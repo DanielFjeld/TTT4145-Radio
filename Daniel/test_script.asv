@@ -7,7 +7,7 @@ clear all;
 resend = 1;
 Message = 'Hello';
 Number_size = 8; %int8_t
-Number = 123; %number to be sent
+Number = 69; %number to be sent
 
 Simulate = false;
 
@@ -57,8 +57,8 @@ rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymb
 
 
 coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=24,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
@@ -136,9 +136,8 @@ frameTxOut = MessageBits; %frame
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i;
-padding1 = zeros(200, 1);
-padding2 = zeros(2000, 1);
-modSig = [padding1; ImPreamble; msg; padding2;]; %make signal imaginary
+padding = zeros(200, 1);
+modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
