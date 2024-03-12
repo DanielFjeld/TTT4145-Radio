@@ -157,16 +157,19 @@ end
 
 %% ---- Receiver ----
 
-%agcData = agc(rx());
+while(1)
+   
+agcData = agc(rx());
 if(Simulate == false)
     filteredData = rxfilter(rx());
 else
     filteredData = rxfilter(rxSig);
 end
-
+release(coarseFrequencyCompensator);
+release(coarseFrequencyCompensator);
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 
-synchronizedSymbol = symbolSynchronizer(coarseFreq);
+%synchronizedSymbol = symbolSynchronizer(coarseFreq);
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 %synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
@@ -180,21 +183,24 @@ L = length(corr);
 [v,i] = max(corr); %i = start of index
 
 %get amplitude and angle of correlation
-amp = abs(v)
-theta = atan2(imag(v),real(v))*180/pi+17 %dont know why barker is 17deg off data
+amp = abs(v);
+if(amp > 40)
+theta = atan2(imag(v),real(v))*180/pi+17; %dont know why barker is 17deg off data
 
 %apply offset
 phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
-preambleIndex = (i-(L+1)/2)+1 + 26 %find start of preamble
-phaseTxOut = ImRxOut((preambleIndex):size(ImRxOut, 1)); %set start of data
+preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
+if(preambleIndex < size(ImRxOut, 1))
+phaseTxOut = ImRxOut(preambleIndex:size(ImRxOut, 1)); %set start of data
 phaseTxOut = phaseOffset(phaseTxOut);
 
 rxOut = qpskdemod(phaseTxOut); %generate bits from const diagram
 rxOut = rxOut(1:end);
 
 EOF = size(TrellisTxOut, 1);
+if(EOF <= size(rxOut,1))
 FrameDetectOut = rxOut(1:EOF);
 
 %% Trells decoding, Veterbi
@@ -238,6 +244,8 @@ rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
+if(0)
+
 if(isequal(TrellsRxOut ,TrellisTxIn))
     disp('Trellis OK');
 else
@@ -276,22 +284,30 @@ else
     fprintf('CRC OK\n\n');
 end
 
+
+
+end
+
 %% Print data recived
+if(errFlag);
+else
 formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
+end
 
 %% print diagrams
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
-%constDiagram5(phaseTxOut) %dont know what this is
-
-release(tx);
-release(rx);
+constDiagram4(synchronizedCarrier)
+constDiagram5(phaseTxOut) %dont know what this is
+end
+end
+end
+end
 
 %% creating functions test
-[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
+%%[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
 formatSpec = '%s%d\n';
 %fprintf(formatSpec, y, x);
 

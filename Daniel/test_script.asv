@@ -7,7 +7,7 @@ clear all;
 resend = 1;
 Message = 'Hello';
 Number_size = 8; %int8_t
-Number = 69; %number to be sent
+Number = 123; %number to be sent
 
 Simulate = false;
 
@@ -57,8 +57,8 @@ rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymb
 
 
 coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=24,DampingFactor=1,NormalizedLoopBandwidth=0.01);
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=12,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2, RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
@@ -136,8 +136,9 @@ frameTxOut = MessageBits; %frame
 modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i;
-padding = zeros(200, 1);
-modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
+padding1 = zeros(200, 1);
+padding2 = zeros(2000, 1);
+modSig = [padding1; ImPreamble; msg; padding2;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -156,16 +157,19 @@ end
 
 %% ---- Receiver ----
 
-%agcData = agc(rx());
+while(1)
+   
+agcData = agc(rx());
 if(Simulate == false)
     filteredData = rxfilter(rx());
 else
     filteredData = rxfilter(rxSig);
 end
-
+release(coarseFrequencyCompensator);
+release(coarseFrequencyCompensator);
 coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 
-synchronizedSymbol = symbolSynchronizer(coarseFreq);
+%synchronizedSymbol = symbolSynchronizer(coarseFreq);
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 %synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
@@ -180,6 +184,7 @@ L = length(corr);
 
 %get amplitude and angle of correlation
 amp = abs(v)
+if(amp > 40)
 theta = atan2(imag(v),real(v))*180/pi+17 %dont know why barker is 17deg off data
 
 %apply offset
@@ -187,13 +192,15 @@ phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
 preambleIndex = (i-(L+1)/2)+1 + 26 %find start of preamble
-phaseTxOut = ImRxOut((preambleIndex):size(ImRxOut, 1)); %set start of data
+if(preambleIndex > size(ImRxOut, 1))
+phaseTxOut = ImRxOut(preambleIndex:size(ImRxOut, 1)); %set start of data
 phaseTxOut = phaseOffset(phaseTxOut);
 
 rxOut = qpskdemod(phaseTxOut); %generate bits from const diagram
 rxOut = rxOut(1:end);
 
 EOF = size(TrellisTxOut, 1);
+if(EOF <= size(rxOut,1))
 FrameDetectOut = rxOut(1:EOF);
 
 %% Trells decoding, Veterbi
@@ -285,12 +292,13 @@ fprintf(formatSpec, decodedMessage, rx_number);
 %constDiagram3(coarseFreq)
 %constDiagram4(synchronizedCarrier)
 %constDiagram5(phaseTxOut) %dont know what this is
+end
+end
+end
 
-release(tx);
-release(rx);
 
 %% creating functions test
-[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
+%%[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
 formatSpec = '%s%d\n';
 %fprintf(formatSpec, y, x);
 
