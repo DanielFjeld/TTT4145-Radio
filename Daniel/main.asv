@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-resend = 1;
+resend = 10;
 Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
@@ -12,6 +12,7 @@ Number = 69; %number to be sent
 Simulate = false;
 RX_LOOP = true;
 TX_LOOP = true;
+TX_AWGN = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
@@ -147,7 +148,7 @@ modulateTxIn = frameTxOut;
 msg = qpskmod(modulateTxIn);
 ImPreamble = Preamble+Preamble*i;
 padding = zeros(200, 1);
-modSig = [padding; ImPreamble; msg; padding;]; %make signal imaginary
+modSig = [ImPreamble; msg;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -157,8 +158,11 @@ rxSig = 0;
 %transmitt on Adalm pluto
 
 if(Simulate == false)
+    rxSig = txData;
+    if(TX_AWGN)
     offsetData = pfo(txData);
     rxSig = channel(offsetData);
+    end
     tx.transmitRepeat(rxSig); %transmitt the data
     
 %simulate
@@ -169,9 +173,9 @@ end
 
 %% ---- Receiver ----
 while(RX_LOOP)
-%agcData = agc(rx());
+agcData = agc(rx());
 if(Simulate == false)
-    filteredData = rxfilter(rx());
+    filteredData = rxfilter(agcData);
 else
     filteredData = rxfilter(rxSig);
 end
@@ -186,7 +190,7 @@ end
 coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
 %coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 
-synchronizedSymbol = symbolSynchronizer(coarseFreq);
+%synchronizedSymbol = symbolSynchronizer(coarseFreq);
 synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
 %synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
 
@@ -200,14 +204,14 @@ L = length(corr);
 [v,i] = max(corr); %i = start of index
 
 %get amplitude and angle of correlation
-amp = abs(v)
-theta = atan2(imag(v),real(v))*180/pi
+amp = abs(v);
+theta = atan2(imag(v),real(v))*180/pi;
 
 %apply offset
 phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
-preambleIndex = (i-(L+1)/2)+1 %find start of preamble
+preambleIndex = (i-(L+1)/2)+1; %find start of preamble
 phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
 phaseTxOut = phaseOffset(phaseTxOut);
 
@@ -258,6 +262,16 @@ rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
+if(RX_LOOP)
+    count = count + 1;
+    
+    if(isequal(TrellsRxOut ,TrellisTxIn))
+
+
+    formatSpec = '%s%d 1%d   2%d   3%d   4%d   5%d   6%d \n';
+    fprintf(formatSpec, decodedMessage, rx_number);
+else
+
 if(isequal(TrellsRxOut ,TrellisTxIn))
     disp('Trellis OK');
 else
@@ -299,7 +313,7 @@ end
 %% Print data recived
 formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
-
+end
 %% print diagrams
 %constDiagram1(txData)
 %constDiagram2(filteredData)
@@ -308,6 +322,7 @@ constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
+else
     release(tx);
 end
 
