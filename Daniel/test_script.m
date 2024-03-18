@@ -151,6 +151,9 @@ rxSig = 0;
 %transmitt on Adalm pluto
 if(Simulate == false)
     tx.transmitRepeat(txData); %transmitt the data
+    %while(1)
+    %end
+    %release(tx);
     
 %simulate
 else
@@ -307,17 +310,19 @@ formatSpec = '%d %d %s%d\n';
 fprintf(formatSpec, success , errors,  decodedMessage, rx_number);
 end
 
+end
+end
+end
+
 %% print diagrams
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
 constDiagram4(synchronizedCarrier)
-constDiagram5(phaseTxOut) %dont know what this is
+%constDiagram5(phaseTxOut) %dont know what this is
 
 
-end
-end
-end
+
 end
 
 %% creating functions test
