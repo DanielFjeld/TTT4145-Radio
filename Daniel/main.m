@@ -4,7 +4,7 @@
 clear all;
 
 %% Parameters
-resend = 8;
+resend = 1;
 Message = 'ABCDE';
 Number_size = 7; %int8_t
 Number = 69; %number to be sent
@@ -103,17 +103,17 @@ for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
         sprintf('%s', Message);
 end
-seq = barker();
-seq = max(0, seq); %%make barker bits between 0 and 1 
+%seq = barker();
+%seq = max(0, seq); %%make barker bits between 0 and 1 
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
+MsgTxOut = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7);zeros(64, 1);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
 crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
-CRCtxBits = [int2bit(CRCtxIn, 7); int2bit(Number, Number_size);]; %CRC frame
-CRCtxOut = crcGen(CRCtxBits);
+CRCtxOut = crcGen(CRCtxIn);
 
 %% hamming encoding
 HammingTxIn = CRCtxOut;
@@ -167,7 +167,12 @@ scrambler =  comm.Scrambler( ...
 ScramblerTXout = scrambler(ScramblerTXin);
 
 %% modululate from real to imaginary numbers and add preamble
-modulateTxIn = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7); int2bit(Number, Number_size);zeros(64, 1);]; %%ScramblerTXout;
+modulateTxIn = [CRCtxOut;zeros(64, 1);]; %%ScramblerTXout;
+
+if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
+    modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
+end
+
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 ImPreamble = Preamble+Preamble*i;
@@ -200,10 +205,10 @@ else
     rxSig = channel(offsetData);
 end
 
+%
+
 %% ---- Receiver ----
 while(RX_LOOP)
-%pause(1);
-
 
 agcData = agc(rx());
 
@@ -285,7 +290,7 @@ DetectedRxData = decode(HammingRxIn,n,k,'hamming/binary');
 HammingRxOut = DetectedRxData(1:size(CRCtxOut, 1));
 
 %% CRC check
-CRCrxIn = HammingRxOut;
+CRCrxIn = FrameDetectOut(1:size(CRCtxOut, 1)); %HammingRxOut;
 % Create a CRC detector with the same settings as the generator
 crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 % Check the received data for CRC errors
