@@ -9,10 +9,12 @@ Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
+TXID = 1;
+RXID = 2;
+
 Simulate = false;
 RX_LOOP = true;
 TX_LOOP = true;
-TX_AWGN = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
@@ -85,7 +87,7 @@ coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK"
 
 %errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
-agc.DesiredOutputPower = 2;
+agc.DesiredOutputPower = 1;
 agc.AveragingLength = 50;
 agc.MaxPowerGain = 60;
 
@@ -167,14 +169,19 @@ rxSig = 0;
 %% transmitt data
 %transmitt on Adalm pluto
 
-if(Simulate == false)
-    rxSig = txData;
-    if(TX_AWGN)
-    offsetData = pfo(txData);
-    rxSig = channel(offsetData);
-    end
-    tx.transmitRepeat(txData); %transmitt the data
+
+  inputProvided = false;
+   
+%if ~isempty(get(gcf, 'CurrentCharacter'))
+%    userInput = get(gcf, 'CurrentCharacter');
+%    set(gcf, 'CurrentCharacter', ''); % Clear the current character
+%    inputProvided = true;
+%    break; % Exit the loop if input is detected
+%end
     
+
+if(Simulate == false)
+    tx.transmitRepeat(txData); %transmitt the data
 %simulate
 else
     offsetData = pfo(txData);
@@ -183,7 +190,11 @@ end
 
 %% ---- Receiver ----
 while(RX_LOOP)
+%pause(1);
+
+
 agcData = agc(rx());
+
 if(Simulate == false)
     filteredData = rxfilter(agcData);
 else

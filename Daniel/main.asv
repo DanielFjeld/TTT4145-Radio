@@ -9,13 +9,21 @@ Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
+TXID = 1;
+RXID = 2;
+
 Simulate = false;
 RX_LOOP = true;
 TX_LOOP = true;
-TX_AWGN = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
+
+
+%prompt = 'NUM:';
+%x = input(prompt)
+%prompt = 'TXT:';
+%txt = input(prompt,"s")
 
 
 
@@ -160,20 +168,20 @@ rxSig = 0;
 
 %% transmitt data
 %transmitt on Adalm pluto
-prompt = 'NUM:';
-x = input(prompt)
-prompt = 'TXT:';
-txt = input(prompt,"s")
 
+
+  inputProvided = false;
+   
+%if ~isempty(get(gcf, 'CurrentCharacter'))
+%    userInput = get(gcf, 'CurrentCharacter');
+%    set(gcf, 'CurrentCharacter', ''); % Clear the current character
+%    inputProvided = true;
+%    break; % Exit the loop if input is detected
+%end
+    
 
 if(Simulate == false)
-    rxSig = txData;
-    if(TX_AWGN)
-    offsetData = pfo(txData);
-    rxSig = channel(offsetData);
-    end
-    tx.transmitRepeat(txData); %transmitt the data
-    
+    %tx.transmitRepeat(txData); %transmitt the data
 %simulate
 else
     offsetData = pfo(txData);
@@ -182,7 +190,11 @@ end
 
 %% ---- Receiver ----
 while(RX_LOOP)
+pause(1);
+
+
 agcData = agc(rx());
+
 if(Simulate == false)
     filteredData = rxfilter(agcData);
 else
@@ -221,12 +233,16 @@ phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
 preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
-if(preambleIndex <)
-phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
-phaseTxOut = phaseOffset(phaseTxOut);
-
-rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+if(size(ImRxOut, 1) - preambleIndex > 0)
+    phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
+    phaseTxOut = phaseOffset(phaseTxOut);
+    rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+    
+else
+    rxOutTemp = [zeros(1,1)];
+end
 rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
+
 
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
