@@ -4,8 +4,8 @@
 clear all;
 
 %% Parameters
-resend = 10;
-Message = 'Hello';
+resend = 1;
+Message = 'ldsfahselfhlisdigsdfgv';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -128,7 +128,7 @@ trellis = poly2trellis([4 3],[4 5 17;7 4 2]);
 tbdepth = 5 * 3; % A common practice for traceback depth
 
 TrellisTxOut = convenc(TrellisTxIn,trellis);
-TrellisTxOut = TrellisTxIn; %%BYPASS
+TrellisTxOut = TrellisTxIn %%BYPASS
 %%modulate, add noise and demodulate
 %modulatedSignal = qpskmod(code); % QPSK modulation
 %SNR = 5; % Signal-to-noise ratio in dB
