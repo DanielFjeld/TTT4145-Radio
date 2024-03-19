@@ -71,11 +71,11 @@ pMeanFreqOff = 0;
 pCnt = 0;
 pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","FFT-based",SampleRate=200000);
 pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",200000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=5.4,Modulation="PAM/PSK/QAM");
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=6,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=5.4,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',12,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',12,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=2);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
@@ -154,8 +154,20 @@ end
 
 frameTxOut = MessageBits; %frame
 
+%% Scrambler
+ScramblerBase = 2;
+ScramblerPolynomial = [1 1 1 0 1];
+ScramblerInitialConditions = [0 0 0 0];
+
+ScramblerTXin = frameTxOut;
+scrambler =  comm.Scrambler( ...
+                ScramblerBase, ...
+                ScramblerPolynomial, ...
+                ScramblerInitialConditions);
+ScramblerTXout = scrambler(ScramblerTXin);
+
 %% modululate from real to imaginary numbers and add preamble
-modulateTxIn = frameTxOut;
+modulateTxIn = ScramblerTXout;
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 ImPreamble = Preamble+Preamble*i;
@@ -247,8 +259,17 @@ rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
 
+%% Descrambler
+
+ScramblerRXin = FrameDetectOut;
+
+descrambler = comm.Descrambler(ScramblerBase, ...
+                ScramblerPolynomial, ScramblerInitialConditions);
+ScramblerRXout = descrambler(ScramblerRXin);
+
+
 %% Trells decoding, Veterbi
-TrellsRxIn = FrameDetectOut;
+TrellsRxIn = ScramblerRXout;
 %TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
 TrellsRxOut = TrellsRxIn; %BYPASS
 
