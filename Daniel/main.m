@@ -4,9 +4,9 @@
 clear all;
 
 %% Parameters
-resend = 10;
-Message = 'Hello';
-Number_size = 8; %int8_t
+resend = 8;
+Message = 'ABCDE';
+Number_size = 7; %int8_t
 Number = 69; %number to be sent
 
 TXID = 1;
@@ -69,13 +69,13 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
 pMeanFreqOff = 0;
 pCnt = 0;
-pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","FFT-based",SampleRate=200000);
-pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",200000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=6,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=5.4,Modulation="PAM/PSK/QAM");
+pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","FFT-based",SampleRate=400000);
+pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",400000);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=5.4,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',12,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',12,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=2);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
@@ -167,7 +167,7 @@ scrambler =  comm.Scrambler( ...
 ScramblerTXout = scrambler(ScramblerTXin);
 
 %% modululate from real to imaginary numbers and add preamble
-modulateTxIn = ScramblerTXout;
+modulateTxIn = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7); int2bit(Number, Number_size);zeros(64, 1);]; %%ScramblerTXout;
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 ImPreamble = Preamble+Preamble*i;
@@ -292,8 +292,14 @@ crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions'
 [detectedData, errFlag] = crcDet(CRCrxIn);
 
 %% reshape bits
+reshapeRxIn = FrameDetectOut; %detectedData;
+%%Extract number
+rx_number_bits = reshapeRxIn(1:7);
+rx_number = bit2int(rx_number_bits,Number_size);
+
+
 % Extract the message bits after the Barker codes
-reshapeRxIn = detectedData;
+reshapeRxIn = FrameDetectOut(8:end); %detectedData;
 endOfMessage = MessageLength*7*resend;
 messageBits = reshapeRxIn(1:endOfMessage);
 
@@ -304,11 +310,7 @@ messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remov
 % Convert each 7-bit group to a character
 decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
 
-%%Extract number
-number_index_start = endOfMessage+1;
-number_index_stop = number_index_start+Number_size-1;
-rx_number_bits = DetectedRxData(number_index_start:number_index_stop);
-rx_number = bit2int(rx_number_bits,Number_size);
+
 
 %% ---- Error calculation ----
 if(RX_LOOP)
