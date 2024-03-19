@@ -4,8 +4,8 @@
 clear all;
 
 %% Parameters
-resend = 1;
-Message = 'ldsfahselfhlisdigsdfgv';
+resend = 10;
+Message = 'Hello';
 Number_size = 8; %int8_t
 Number = 69; %number to be sent
 
@@ -128,7 +128,7 @@ trellis = poly2trellis([4 3],[4 5 17;7 4 2]);
 tbdepth = 5 * 3; % A common practice for traceback depth
 
 TrellisTxOut = convenc(TrellisTxIn,trellis);
-TrellisTxOut = TrellisTxIn %%BYPASS
+TrellisTxOut = TrellisTxIn; %%BYPASS
 %%modulate, add noise and demodulate
 %modulatedSignal = qpskmod(code); % QPSK modulation
 %SNR = 5; % Signal-to-noise ratio in dB
@@ -193,7 +193,7 @@ end
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            pCnt = pCnt + 1;            % update state
+            %pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
 coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
@@ -220,12 +220,13 @@ theta = atan2(imag(v),real(v))*180/pi;
 phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
-preambleIndex = (i-(L+1)/2)+1; %find start of preamble
+preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
+if(preambleIndex <)
 phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
 phaseTxOut = phaseOffset(phaseTxOut);
 
-rxOut = qpskdemod(phaseTxOut(1+26:end)); %generate bits from const diagram
-rxOut = [rxOut(1:end); zeros(size(TrellisTxOut, 1),1)];
+rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
 
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
@@ -274,7 +275,7 @@ rx_number = bit2int(rx_number_bits,Number_size);
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 10 && size(rxOut, 1) > size(FrameDetectOut, 1))
+    if(amp > 10 && size(rxOutTemp, 1) > EOF)
         count = count + 1;
         
         if(errFlag)

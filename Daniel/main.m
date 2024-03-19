@@ -18,6 +18,12 @@ MessageLength = strlength(Message);
 SamplesPerSymbol = 12;
 
 
+%prompt = 'NUM:';
+%x = input(prompt)
+%prompt = 'TXT:';
+%txt = input(prompt,"s")
+
+
 
 %% Setup
 
@@ -160,11 +166,6 @@ rxSig = 0;
 
 %% transmitt data
 %transmitt on Adalm pluto
-prompt = 'NUM:';
-x = input(prompt)
-prompt = 'TXT:';
-txt = input(prompt,"s")
-
 
 if(Simulate == false)
     rxSig = txData;
@@ -221,11 +222,16 @@ phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
 
 
 preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
-phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
-phaseTxOut = phaseOffset(phaseTxOut);
-
-rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+if(size(ImRxOut, 1) - preambleIndex > 0)
+    phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
+    phaseTxOut = phaseOffset(phaseTxOut);
+    rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+    
+else
+    rxOutTemp = [zeros(1,1)];
+end
 rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
+
 
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
