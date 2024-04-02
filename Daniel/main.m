@@ -177,7 +177,7 @@ msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 ImPreamble = Preamble+Preamble*i;
 padding = zeros(14000, 1);
-modSig = [ImPreamble; msg;]; %make signal imaginary
+modSig = [msg; ImPreamble; msg; msg;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
@@ -197,8 +197,17 @@ rxSig = 0;
 %end
     
 
-if(Simulate == false)
-    tx.transmitRepeat(txData); %transmitt the data
+if(Simulate == false && TX_LOOP)
+    %tx.transmitRepeat(txData); %transmitt the data
+
+
+    while(1)
+    tx(txData);
+    %fprintf("hello");
+    tic
+    while(toc < 0.5)
+    end
+    end
 %simulate
 else
     offsetData = pfo(txData);
@@ -319,15 +328,15 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 10 && size(rxOutTemp, 1) > EOF)
+    if(amp > 30 && size(rxOutTemp, 1) > EOF)
         count = count + 1;
         
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
-        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d \n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok);
+        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
     end
 else
 
