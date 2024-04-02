@@ -3,16 +3,23 @@
 % clear all, will clear persistant variables wich may be stuck after last compile
 clear all;
 
+NODE = 0;
+TXID = 1;
+RXID = 2;
+
 %% Parameters
 resend = 1;
-Message = 'ABCDE';
+if(NODE)
+    Message = ' ACK ';
+else
+    Message = 'ABCDE';
+end
 Number_size = 7; %int8_t
 %Number = 69; %number to be sent
 
-NODE = 0;
 
-TXID = 1;
-RXID = 2;
+
+
 
 Simulate = false;
 RX_LOOP = true;
@@ -20,13 +27,6 @@ TX_LOOP = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
-
-
-%prompt = 'NUM:';
-%x = input(prompt)
-%prompt = 'TXT:';
-%txt = input(prompt,"s")
-
 
 
 %% Setup
@@ -224,7 +224,7 @@ ack = 0;
 while(RX_LOOP)
 
 if(NODE == 0)
-    if(toc > 0.05 && ack == 0)
+    if(toc > 0.1 && ack == 0)
       tic  
       tx(txData);
     end
@@ -355,10 +355,12 @@ if(RX_LOOP)
         else
             CRCok = CRCok +1;
         end
+        if(rx_number == RXID)
         formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
         fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
         if(errFlag == 0 && rx_number == RXID)
             ack = 1;
+        end
         end
     end
 else
