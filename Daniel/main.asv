@@ -197,7 +197,7 @@ rxSig = 0;
 %end
     
 
-if(Simulate == false)
+if(Simulate == false && TX_LOOP)
     %tx.transmitRepeat(txData); %transmitt the data
 
 
@@ -219,10 +219,10 @@ end
 %% ---- Receiver ----
 while(RX_LOOP)
 
-agcData = agc(rx());
+%agcData = agc(rx());
 
 if(Simulate == false)
-    filteredData = rxfilter(agcData);
+    filteredData = rxfilter(rx());
 else
     filteredData = rxfilter(rxSig);
 end
@@ -328,15 +328,15 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 10 && size(rxOutTemp, 1) > EOF)
+    if(amp > 3 && size(rxOutTemp, 1) > EOF)
         count = count + 1;
         
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
-        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d \n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok);
+        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
     end
 else
 

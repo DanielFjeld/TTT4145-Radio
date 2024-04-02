@@ -14,7 +14,7 @@ RXID = 2;
 
 Simulate = false;
 RX_LOOP = true;
-TX_LOOP = true;
+TX_LOOP = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
@@ -203,9 +203,10 @@ if(Simulate == false && TX_LOOP)
 
     while(1)
     tx(txData);
-    %fprintf("hello");
+    %fprintf("hello \t\n");
     tic
-    while(toc < 0.5)
+    while(toc < 1)
+        
     end
     end
 %simulate
@@ -219,10 +220,17 @@ end
 %% ---- Receiver ----
 while(RX_LOOP)
 
-agcData = agc(rx());
+
+if(toc > 1)
+  fprintf("hello \t\n");
+  tic  
+  tx(txData);
+end
+   
+%agcData = agc(rx());
 
 if(Simulate == false)
-    filteredData = rxfilter(agcData);
+    filteredData = rxfilter(rx());
 else
     filteredData = rxfilter(rxSig);
 end
@@ -328,7 +336,7 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 30 && size(rxOutTemp, 1) > EOF)
+    if(amp > 5 && size(rxOutTemp, 1) > EOF)
         count = count + 1;
         
         if(errFlag)
@@ -391,7 +399,7 @@ constDiagram4(synchronizedCarrier)
 
 if(TX_LOOP)
 else
-    release(tx);
+ %   release(tx);
 end
 
 end
