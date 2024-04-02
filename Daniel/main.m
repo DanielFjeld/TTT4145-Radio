@@ -108,7 +108,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7);zeros(64, 1);];
+MsgTxOut = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -176,7 +176,7 @@ end
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 ImPreamble = Preamble+Preamble*i;
-padding = zeros(200, 1);
+padding = zeros(14000, 1);
 modSig = [ImPreamble; msg;]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
