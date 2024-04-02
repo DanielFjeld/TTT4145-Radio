@@ -7,7 +7,9 @@ clear all;
 resend = 1;
 Message = 'ABCDE';
 Number_size = 7; %int8_t
-Number = 69; %number to be sent
+%Number = 69; %number to be sent
+
+NODE = 0;
 
 TXID = 1;
 RXID = 2;
@@ -108,7 +110,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(MsgTxOut, 7);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -218,15 +220,25 @@ end
 %
 
 %% ---- Receiver ----
+ack = 0;
 while(RX_LOOP)
 
-
-if(toc > 1)
-  fprintf("hello \t\n");
-  tic  
-  tx(txData);
+if(NODE == 0)
+    if(toc > 0.05 && ack == 0)
+      tic  
+      tx(txData);
+    end
+    if(toc > 1 && ack == 1)
+      ack = 0;
+      tic  
+      tx(txData);
+    end
 end
-   
+if(NODE == 1 && ack == 1)
+    ack = 0;
+    tx(txData);
+end
+
 %agcData = agc(rx());
 
 if(Simulate == false)
@@ -345,6 +357,9 @@ if(RX_LOOP)
         end
         formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
         fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
+        if(errFlag == 0 && rx_number == RXID)
+            ack = 1;
+        end
     end
 else
 

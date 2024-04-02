@@ -7,14 +7,16 @@ clear all;
 resend = 1;
 Message = 'ABCDE';
 Number_size = 7; %int8_t
-Number = 69; %number to be sent
+%Number = 69; %number to be sent
+
+NODE = 0;
 
 TXID = 1;
 RXID = 2;
 
 Simulate = false;
 RX_LOOP = true;
-TX_LOOP = true;
+TX_LOOP = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
@@ -108,7 +110,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(Number, Number_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(MsgTxOut, 7);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -203,9 +205,10 @@ if(Simulate == false && TX_LOOP)
 
     while(1)
     tx(txData);
-    %fprintf("hello");
+    %fprintf("hello \t\n");
     tic
-    while(toc < 0.5)
+    while(toc < 1)
+        
     end
     end
 %simulate
@@ -217,8 +220,20 @@ end
 %
 
 %% ---- Receiver ----
+ack = 0;
 while(RX_LOOP)
 
+
+if(toc > 0.05 && ack == 0)
+  tic  
+  tx(txData);
+end
+if(toc > 1 && ack == 1)
+  ack = 0;
+  tic  
+  tx(txData);
+end
+   
 %agcData = agc(rx());
 
 if(Simulate == false)
@@ -328,7 +343,7 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 3 && size(rxOutTemp, 1) > EOF)
+    if(amp > 5 && size(rxOutTemp, 1) > EOF)
         count = count + 1;
         
         if(errFlag)
@@ -337,6 +352,9 @@ if(RX_LOOP)
         end
         formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
         fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
+        if(errFlag == 0 && rx_number == RXID)
+            ack = 1;
+        end
     end
 else
 
@@ -391,7 +409,7 @@ constDiagram4(synchronizedCarrier)
 
 if(TX_LOOP)
 else
-    release(tx);
+ %   release(tx);
 end
 
 end
