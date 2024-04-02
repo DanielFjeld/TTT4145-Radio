@@ -32,6 +32,7 @@ SamplesPerSymbol = 12;
 %% Setup
 
 count = 0;
+count2 = 0;
 CRCok = 0;
 
 % Setup Receiver
@@ -224,17 +225,22 @@ ack = 0;
 while(RX_LOOP)
 
 if(NODE == 0)
-    if(toc > 0.1 && ack == 0)
+    if(toc > 0.05 && ack == 0)
       tic  
       tx(txData);
+      count = count + 1;
+      count2 = count2 + 1;
     end
-    if(toc > 1 && ack == 1)
+    if(toc > 0.1 && ack == 1)
       ack = 0;
       tic  
       tx(txData);
+      count2 = 1;
     end
 end
 if(NODE == 1 && ack == 1)
+    count = count + 1;
+    count2 = count2 + 1;
     ack = 0;
     tx(txData);
 end
@@ -348,20 +354,22 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 5 && size(rxOutTemp, 1) > EOF)
-        count = count + 1;
+    if(amp > 5 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
+        
         
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
-        if(rx_number == RXID)
-        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
+        rate = 1/count2;
+        rate2 = CRCok/count;
+
+        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d success %f success2 %f\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate, rate2);
         if(errFlag == 0 && rx_number == RXID)
             ack = 1;
         end
-        end
+       
     end
 else
 
@@ -411,7 +419,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)

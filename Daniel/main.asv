@@ -3,16 +3,23 @@
 % clear all, will clear persistant variables wich may be stuck after last compile
 clear all;
 
+NODE = 0;
+TXID = 1;
+RXID = 2;
+
 %% Parameters
 resend = 1;
-Message = 'ABCDE';
+if(NODE)
+    Message = ' ACK ';
+else
+    Message = 'ABCDE';
+end
 Number_size = 7; %int8_t
 %Number = 69; %number to be sent
 
-NODE = 0;
 
-TXID = 1;
-RXID = 2;
+
+
 
 Simulate = false;
 RX_LOOP = true;
@@ -22,16 +29,10 @@ MessageLength = strlength(Message);
 SamplesPerSymbol = 12;
 
 
-%prompt = 'NUM:';
-%x = input(prompt)
-%prompt = 'TXT:';
-%txt = input(prompt,"s")
-
-
-
 %% Setup
 
 count = 0;
+count2 = 0;
 CRCok = 0;
 
 % Setup Receiver
@@ -223,17 +224,27 @@ end
 ack = 0;
 while(RX_LOOP)
 
+if(NODE == 0)
+    if(toc > 0.05 && ack == 0)
+      tic  
+      tx(txData);
+      count = count + 1;
+      count2 = count2 + 1;
+    end
+    if(toc > 0.1 && ack == 1)
+      ack = 0;
+      tic  
+      tx(txData);
+      count2 = 1;
+    end
+end
+if(NODE == 1 && ack == 1)
+    count = count + 1;
+    count2 = count2 + 1;
+    ack = 0;
+    tx(txData);
+end
 
-if(toc > 0.05 && ack == 0)
-  tic  
-  tx(txData);
-end
-if(toc > 1 && ack == 1)
-  ack = 0;
-  tic  
-  tx(txData);
-end
-   
 %agcData = agc(rx());
 
 if(Simulate == false)
@@ -343,18 +354,22 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 5 && size(rxOutTemp, 1) > EOF)
-        count = count + 1;
+    if(amp > 5 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
+        
         
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
-        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d\n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp);
+        rate = 1/count2;
+        rate2 = CRCok/count;
+
+        formatSpec = '%s%d count%d   CRCerror%d   CRCok%d amp%d success %f success2 %f\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate, rate2);
         if(errFlag == 0 && rx_number == RXID)
             ack = 1;
         end
+       
     end
 else
 
@@ -404,7 +419,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
