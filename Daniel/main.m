@@ -38,14 +38,27 @@ count = 0;
 count2 = 0;
 CRCok = 0;
 
+Freq1 = 910e6;
+Freq2 = 916e6;
+
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
-rx.CenterFrequency = 916e6;
+if(NODE)
+ rx.CenterFrequency = Freq1;
+else 
+ rx.CenterFrequency = Freq2;
+end
+
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
-tx.CenterFrequency = 916e6;
+if(NODE)
+ tx.CenterFrequency = Freq2;
+else 
+ tx.CenterFrequency = Freq1;
+end
+
 tx.Gain = 0;
 tx.BasebandSampleRate = 400000;
 tx.SamplesPerFrame = 11226;
@@ -108,8 +121,38 @@ Preamble = [bar; bar;];
 
 ImPreamble = Preamble+Preamble*i;
 
-ack = 0;
+ack = 1;
+transmitt_message = 0;
 while(RX_LOOP)
+
+ if(NODE == 0)
+    if(toc > 0.01) %&& ack == 1
+      if(ack)
+          size_of_input = 0;
+          while(size_of_input ~= 1)
+              prompt = "Input:";
+              text_input = input(prompt, "s");
+              size_of_input = strlength(text_input);
+          end
+          Message = text_input;
+          message_ID = message_ID + 1;
+          if(message_ID == 4)
+              message_ID = 0;
+          end
+      end
+      ack = 0;
+      tic  
+      transmitt_message = 1;
+      count2 = 1;
+      count = count + 1;
+    end
+end
+if(NODE == 1 && ack == 1)
+    count = count + 1;
+    count2 = count2 + 1;
+    ack = 0;
+    transmitt_message = 1;
+end
 
 %% MessageBits
 
@@ -189,34 +232,11 @@ modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
+if(transmitt_message)
+   transmitt_message = 0;
+   tx(txData);
+end
 %% ---- Receiver ----
-
-
-if(NODE == 0)
-    if(toc > 0.05) %&& ack == 1
-      if(ack)
-          prompt = "Input:";
-          text_input = input(prompt, "s");
-          Message = text_input;
-          message_ID = message_ID + 1;
-          if(message_ID == 4)
-              message_ID = 0;
-          end
-      end
-      ack = 0;
-      tic  
-      tx(txData);
-      count2 = 1;
-      count = count + 1;
-    end
-end
-if(NODE == 1 && ack == 1)
-    count = count + 1;
-    count2 = count2 + 1;
-    ack = 0;
-    tx(txData);
-    
-end
 
 %agcData = agc(rx());
 
@@ -321,16 +341,20 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ----
 if(RX_LOOP)
-    if(amp > 2 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
+    if(amp > 1 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
         %rate = 1/count2;
         rate2 = CRCok/count;
+        if(errFlag == 0 && rx_number == RXID)
+            ack = 1;
+        end
+
         if(NODE)
             if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
-                rx_message_id = rx_last_val;
+                rx_last_val = rx_message_id;
                 formatSpec = '%s\n';
                 fprintf(formatSpec, decodedMessage);
             
@@ -338,9 +362,7 @@ if(RX_LOOP)
         else
             formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
             fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
-            if(errFlag == 0 && rx_number == RXID)
-                ack = 1;
-            end
+            
         end
     end
 else
