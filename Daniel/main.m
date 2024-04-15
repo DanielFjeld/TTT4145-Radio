@@ -134,9 +134,9 @@ while(RX_LOOP)
           while(~message_index)
               prompt = "Input:";
               text_input = input(prompt, "s");
-              message_index = strlength(text_input);
+              message_index = strlength(text_input)+1;
               message_index_size = message_index;
-              text_input_char_arr = char(text_input);
+              text_input_char_arr = [char(text_input), char(10)];
           end
           Message = text_input_char_arr(message_index_size - message_index + 1);
           message_index = message_index - 1;
@@ -362,7 +362,7 @@ if(RX_LOOP)
         if(NODE)
             if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
                 rx_last_val = rx_message_id;
-                formatSpec = '%s\n';
+                formatSpec = '%s';
                 fprintf(formatSpec, decodedMessage);
             
             end
