@@ -3,6 +3,8 @@
 % clear all, will clear persistant variables wich may be stuck after last compile
 clear all;
 
+Message = '*';
+
 NODE = 0;
 TXID = 1;
 RXID = 2;
@@ -14,12 +16,12 @@ if(NODE)
 else
     Message = 'A';
 end
+
+Message_ID = 0;
+Message_ID_size = 2;
+
 Number_size = 7; %int8_t
 %Number = 69; %number to be sent
-
-
-
-
 
 Simulate = false;
 RX_LOOP = true;
@@ -37,7 +39,7 @@ CRCok = 0;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
-rx.CenterFrequency = 910e6;
+rx.CenterFrequency = 916e6;
 rx.BasebandSampleRate = 400000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
@@ -94,12 +96,21 @@ agc.DesiredOutputPower = 1;
 agc.AveragingLength = 50;
 agc.MaxPowerGain = 60;
 
+
+
+
 %% create frame
 barker = comm.BarkerCode("Length",13,SamplesPerFrame=13);
 bar = barker();
 Preamble = [bar; bar;];
 
-% MessageBits
+
+ImPreamble = Preamble+Preamble*i;
+
+ack = 0;
+while(RX_LOOP)
+
+%% MessageBits
 
 msgSet = zeros(resend * MessageLength, 1); 
 for msgCnt = 0 : resend-1
@@ -111,7 +122,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(TXID, Number_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(Message_ID, Message_ID_size);int2bit(MsgTxOut, 7);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -140,12 +151,7 @@ tbdepth = 5 * 3; % A common practice for traceback depth
 
 TrellisTxOut = convenc(TrellisTxIn,trellis);
 TrellisTxOut = TrellisTxIn; %%BYPASS
-%%modulate, add noise and demodulate
-%modulatedSignal = qpskmod(code); % QPSK modulation
-%SNR = 5; % Signal-to-noise ratio in dB
-%receivedSignal = awgn(modulatedSignal, SNR, 'measured');
-%noiseVar = 1;
-%softBits = qpskdemod(receivedSignal);
+
 
 %% frame 
 frameTxIn = TrellisTxOut;
@@ -157,17 +163,7 @@ end
 
 frameTxOut = MessageBits; %frame
 
-%% Scrambler
-ScramblerBase = 2;
-ScramblerPolynomial = [1 1 1 0 1];
-ScramblerInitialConditions = [0 0 0 0];
 
-ScramblerTXin = frameTxOut;
-scrambler =  comm.Scrambler( ...
-                ScramblerBase, ...
-                ScramblerPolynomial, ...
-                ScramblerInitialConditions);
-ScramblerTXout = scrambler(ScramblerTXin);
 
 %% modululate from real to imaginary numbers and add preamble
 modulateTxIn = [CRCtxOut;zeros(64, 1);]; %%ScramblerTXout;
@@ -178,60 +174,30 @@ end
 
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
-ImPreamble = Preamble+Preamble*i;
+
+
+
+
+
+
+
 padding = zeros(14000, 1);
 modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
+
+
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
-rxSig = 0;
-
-%% transmitt data
-%transmitt on Adalm pluto
-
-
-  inputProvided = false;
-   
-%if ~isempty(get(gcf, 'CurrentCharacter'))
-%    userInput = get(gcf, 'CurrentCharacter');
-%    set(gcf, 'CurrentCharacter', ''); % Clear the current character
-%    inputProvided = true;
-%    break; % Exit the loop if input is detected
-%end
-    
-
-if(Simulate == false && TX_LOOP)
-    %tx.transmitRepeat(txData); %transmitt the data
-
-
-    while(1)
-    tx(txData);
-    %fprintf("hello \t\n");
-    tic
-    while(toc < 1)
-        
-    end
-    end
-%simulate
-else
-    offsetData = pfo(txData);
-    rxSig = channel(offsetData);
-end
-
-%
-
 %% ---- Receiver ----
-ack = 0;
-while(RX_LOOP)
+
 
 if(NODE == 0)
-    %if(toc > 0.1 && ack == 0)
-    %  tic  
-    %  tx(txData);
-    %  count = count + 1;
-    %  count2 = count2 + 1;
-    %end
-    if(toc > 0.1) %&& ack == 1
+    if(toc > 0.05) %&& ack == 1
+      if(ack)
+          prompt = "Input:";
+          text_input = input(prompt, "s");
+          Message = text_input;
+      end
       ack = 0;
       tic  
       tx(txData);
@@ -244,6 +210,7 @@ if(NODE == 1 && ack == 1)
     count2 = count2 + 1;
     ack = 0;
     tx(txData);
+    
 end
 
 %agcData = agc(rx());
@@ -300,17 +267,9 @@ rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
 
-%% Descrambler
-
-ScramblerRXin = FrameDetectOut;
-
-descrambler = comm.Descrambler(ScramblerBase, ...
-                ScramblerPolynomial, ScramblerInitialConditions);
-ScramblerRXout = descrambler(ScramblerRXin);
-
 
 %% Trells decoding, Veterbi
-TrellsRxIn = ScramblerRXout;
+TrellsRxIn = FrameDetectOut;
 %TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
 TrellsRxOut = TrellsRxIn; %BYPASS
 
@@ -338,9 +297,10 @@ reshapeRxIn = FrameDetectOut; %detectedData;
 rx_number_bits = reshapeRxIn(1:7);
 rx_number = bit2int(rx_number_bits,Number_size);
 
+rx_message_id_bits = reshapeRxIn(8:9);
 
 % Extract the message bits after the Barker codes
-reshapeRxIn = FrameDetectOut(8:end); %detectedData;
+reshapeRxIn = FrameDetectOut(10:end); %detectedData;
 endOfMessage = MessageLength*7*resend;
 messageBits = reshapeRxIn(1:endOfMessage);
 
@@ -418,7 +378,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
+constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
