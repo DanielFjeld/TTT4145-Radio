@@ -17,7 +17,7 @@ else
     Message = 'A';
 end
 
-Message_ID = 0;
+message_ID = 0;
 Message_ID_size = 2;
 
 Number_size = 7; %int8_t
@@ -122,7 +122,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(TXID, Number_size);int2bit(Message_ID, Message_ID_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 7);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -197,6 +197,10 @@ if(NODE == 0)
           prompt = "Input:";
           text_input = input(prompt, "s");
           Message = text_input;
+          message_ID = message_ID + 1;
+          if(message_ID == 4)
+              message_ID = 0;
+          end
       end
       ack = 0;
       tic  
@@ -298,6 +302,7 @@ rx_number_bits = reshapeRxIn(1:7);
 rx_number = bit2int(rx_number_bits,Number_size);
 
 rx_message_id_bits = reshapeRxIn(8:9);
+rx_message_id = bit2int(rx_message_id_bits,Message_ID_size);
 
 % Extract the message bits after the Barker codes
 reshapeRxIn = FrameDetectOut(10:end); %detectedData;
@@ -323,8 +328,8 @@ if(RX_LOOP)
         %rate = 1/count2;
         rate2 = CRCok/count;
 
-        formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f\n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2);
+        formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
         if(errFlag == 0 && rx_number == RXID)
             ack = 1;
         end

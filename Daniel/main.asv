@@ -197,6 +197,8 @@ if(NODE == 0)
           prompt = "Input:";
           text_input = input(prompt, "s");
           Message = text_input;
+          Message_ID = Message_ID+1;
+          if(Message_ID == 4)Message_ID = 0;
       end
       ack = 0;
       tic  
@@ -297,9 +299,10 @@ reshapeRxIn = FrameDetectOut; %detectedData;
 rx_number_bits = reshapeRxIn(1:7);
 rx_number = bit2int(rx_number_bits,Number_size);
 
+rx_message_id_bits = reshapeRxIn(8:9);
 
 % Extract the message bits after the Barker codes
-reshapeRxIn = FrameDetectOut(8:end); %detectedData;
+reshapeRxIn = FrameDetectOut(10:end); %detectedData;
 endOfMessage = MessageLength*7*resend;
 messageBits = reshapeRxIn(1:endOfMessage);
 
@@ -322,8 +325,8 @@ if(RX_LOOP)
         %rate = 1/count2;
         rate2 = CRCok/count;
 
-        formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f\n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2);
+        formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
+        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, Message_ID);
         if(errFlag == 0 && rx_number == RXID)
             ack = 1;
         end
