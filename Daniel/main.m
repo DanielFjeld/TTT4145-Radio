@@ -19,6 +19,7 @@ end
 
 message_ID = 0;
 Message_ID_size = 2;
+rx_last_val = 0;
 
 Number_size = 7; %int8_t
 %Number = 69; %number to be sent
@@ -327,13 +328,20 @@ if(RX_LOOP)
         end
         %rate = 1/count2;
         rate2 = CRCok/count;
-
-        formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
-        fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
-        if(errFlag == 0 && rx_number == RXID)
-            ack = 1;
+        if(NODE)
+            if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
+                rx_message_id = rx_last_val;
+                formatSpec = '%s\n';
+                fprintf(formatSpec, decodedMessage);
+            
+            end
+        else
+            formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
+            fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
+            if(errFlag == 0 && rx_number == RXID)
+                ack = 1;
+            end
         end
-       
     end
 else
 
