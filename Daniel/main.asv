@@ -38,8 +38,8 @@ count = 0;
 count2 = 0;
 CRCok = 0;
 
-Freq1 = 916e6;
-Freq2 = 910e6;
+Freq1 = 910e6;
+Freq2 = 916e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -122,7 +122,46 @@ Preamble = [bar; bar;];
 ImPreamble = Preamble+Preamble*i;
 
 ack = 1;
+transmitt_message = 0;
+rx_message_id = 0;
+message_index = 0;
+message_index_size = 0;
 while(RX_LOOP)
+
+ if(NODE == 0)
+    if(toc > 0.01) %&& ack == 1
+      if(ack)
+          while(~message_index)
+              prompt = "Input:";
+              text_input = input(prompt, "s");
+              message_index = strlength(text_input);
+              message_index_size = message_index;
+              text_input_char_arr = char(text_input);
+          end
+          Message = text_input_char_arr(message_index_size - message_index + 1);
+          message_index = message_index - 1;
+          if(message_index < 0)
+              message_ID = 0;
+          end
+          message_ID = message_ID + 1;
+          if(message_ID == 4)
+              message_ID = 0;
+          end
+      end
+      ack = 0;
+      tic  
+      transmitt_message = 1;
+      count2 = 1;
+      count = count + 1;
+    end
+end
+if(NODE == 1 && ack == 1)
+    count = count + 1;
+    count2 = count2 + 1;
+    ack = 0;
+    transmitt_message = 1;
+    message_ID = rx_message_id;
+end
 
 %% MessageBits
 
@@ -136,7 +175,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 8);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -202,10 +241,11 @@ modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
+if(transmitt_message)
+   transmitt_message = 0;
+   tx(txData);
+end
 %% ---- Receiver ----
-
-
-
 
 %agcData = agc(rx());
 
@@ -296,12 +336,12 @@ rx_message_id = bit2int(rx_message_id_bits,Message_ID_size);
 
 % Extract the message bits after the Barker codes
 reshapeRxIn = FrameDetectOut(10:end); %detectedData;
-endOfMessage = MessageLength*7*resend;
+endOfMessage = MessageLength*8*resend;
 messageBits = reshapeRxIn(1:endOfMessage);
 
 % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
 % This might need adjustment based on how the bits are packed and the total length
-messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remove ; and add '
+messageBitsReshaped = reshape(messageBits, 8, [])'; %can be printed if you remove ; and add '
 
 % Convert each 7-bit group to a character
 decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
@@ -317,9 +357,7 @@ if(RX_LOOP)
         end
         %rate = 1/count2;
         rate2 = CRCok/count;
-        if(errFlag == 0 && rx_number == RXID)
-            ack = 1;
-        end
+        
 
         if(NODE)
             if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
@@ -328,6 +366,9 @@ if(RX_LOOP)
                 fprintf(formatSpec, decodedMessage);
             
             end
+            if(errFlag == 0 && rx_number == RXID)
+            ack = 1;
+        end
         else
             formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
             fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);

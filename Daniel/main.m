@@ -123,18 +123,26 @@ ImPreamble = Preamble+Preamble*i;
 
 ack = 1;
 transmitt_message = 0;
+rx_message_id = 0;
+message_index = 0;
+message_index_size = 0;
 while(RX_LOOP)
 
  if(NODE == 0)
     if(toc > 0.01) %&& ack == 1
       if(ack)
-          size_of_input = 0;
-          while(size_of_input ~= 1)
+          while(~message_index)
               prompt = "Input:";
               text_input = input(prompt, "s");
-              size_of_input = strlength(text_input);
+              message_index = strlength(text_input);
+              message_index_size = message_index;
+              text_input_char_arr = char(text_input);
           end
-          Message = text_input;
+          Message = text_input_char_arr(message_index_size - message_index + 1);
+          message_index = message_index - 1;
+          if(message_index < 0)
+              message_ID = 0;
+          end
           message_ID = message_ID + 1;
           if(message_ID == 4)
               message_ID = 0;
@@ -152,6 +160,7 @@ if(NODE == 1 && ack == 1)
     count2 = count2 + 1;
     ack = 0;
     transmitt_message = 1;
+    message_ID = rx_message_id;
 end
 
 %% MessageBits
@@ -348,9 +357,7 @@ if(RX_LOOP)
         end
         %rate = 1/count2;
         rate2 = CRCok/count;
-        if(errFlag == 0 && rx_number == RXID)
-            ack = 1;
-        end
+        
 
         if(NODE)
             if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
@@ -359,10 +366,15 @@ if(RX_LOOP)
                 fprintf(formatSpec, decodedMessage);
             
             end
+            if(errFlag == 0 && rx_number == RXID)
+                ack = 1;
+            end
         else
             formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
             fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
-            
+            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
+                ack = 1;
+            end
         end
     end
 else
