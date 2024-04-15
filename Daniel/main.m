@@ -166,7 +166,7 @@ end
 %seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
-MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 7);];
+MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 8);];
 
 %% CRC Generation
 CRCtxIn = MsgTxOut;
@@ -327,12 +327,12 @@ rx_message_id = bit2int(rx_message_id_bits,Message_ID_size);
 
 % Extract the message bits after the Barker codes
 reshapeRxIn = FrameDetectOut(10:end); %detectedData;
-endOfMessage = MessageLength*7*resend;
+endOfMessage = MessageLength*8*resend;
 messageBits = reshapeRxIn(1:endOfMessage);
 
 % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
 % This might need adjustment based on how the bits are packed and the total length
-messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remove ; and add '
+messageBitsReshaped = reshape(messageBits, 8, [])'; %can be printed if you remove ; and add '
 
 % Convert each 7-bit group to a character
 decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
