@@ -6,8 +6,8 @@ clear all;
 Message = '*';
 
 NODE = 0;
-TXID = 1;
-RXID = 2;
+TXID = 2;
+RXID = 1;
 
 %% Parameters
 resend = 1;
@@ -38,8 +38,10 @@ count = 0;
 count2 = 0;
 CRCok = 0;
 
-Freq1 = 910e6;
-Freq2 = 916e6;
+%frequenzy = 916MHz
+
+Freq1 = 916.0e6;
+Freq2 = 916.3e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -49,7 +51,7 @@ else
  rx.CenterFrequency = Freq2;
 end
 
-rx.BasebandSampleRate = 400000;
+rx.BasebandSampleRate = 120000;
 rx.SamplesPerFrame = 11226;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
@@ -60,7 +62,7 @@ else
 end
 
 tx.Gain = 0;
-tx.BasebandSampleRate = 400000;
+tx.BasebandSampleRate = 120000;
 tx.SamplesPerFrame = 11226;
 
 %% Constellation diagrams
@@ -129,9 +131,11 @@ message_index_size = 0;
 while(RX_LOOP)
 
  if(NODE == 0)
-    if(toc > 0.01) %&& ack == 1
+    if(toc > 0.05) %&& ack == 1
       if(ack)
           while(~message_index)
+              count = 0;
+              CRCok = 0;
               prompt = "Input:";
               text_input = input(prompt, "s");
               message_index = strlength(text_input)+1;
@@ -228,12 +232,6 @@ end
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 
-
-
-
-
-
-
 padding = zeros(14000, 1);
 modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
@@ -244,6 +242,9 @@ txData = txfilter(modSig); %lp filter (make transitions smooth)
 if(transmitt_message)
    transmitt_message = 0;
    tx(txData);
+   %tx.transmitRepeat(txData);
+   %while(1)
+   %end
 end
 %% ---- Receiver ----
 
@@ -369,7 +370,17 @@ if(RX_LOOP)
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
             end
-        else
+        end
+        if(~NODE && errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val && true)
+            rx_last_val = rx_message_id;
+            formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
+            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
+            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
+                ack = 1;
+            end
+        end
+        if(~NODE && false)
+            rx_last_val = rx_message_id;
             formatSpec = '%s%d count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
             fprintf(formatSpec, decodedMessage, rx_number, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
             if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
@@ -425,40 +436,12 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
 else
  %   release(tx);
 end
-
-end
-release(rx);
-
-%% creating functions test
-[y, x] = test(reshapeRxIn, MessageLength*resend, Number_size);
-formatSpec = '%s%d\n';
-%fprintf(formatSpec, y, x);
-
-function [y, x] = test(reshapeRxIn, MessageLength, Number_size)
-% Extract the message bits after the Barker codes
-endOfMessage = MessageLength*7;
-messageBits = reshapeRxIn(1:endOfMessage);
-
-% Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
-% This might need adjustment based on how the bits are packed and the total length
-messageBitsReshaped = reshape(messageBits, 7, [])'; %can be printed if you remove ; and add '
-
-% Convert each 7-bit group to a character
-decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
-
-%%Extract number
-number_index_start = endOfMessage+1;
-number_index_stop = number_index_start+Number_size-1;
-rx_number_bits = reshapeRxIn(number_index_start:number_index_stop);
-rx_number = bit2int(rx_number_bits,Number_size);
-y = decodedMessage;
-x = rx_number;
 
 end
