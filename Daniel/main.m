@@ -6,8 +6,8 @@ clear all;
 Message = '*';
 
 NODE = 0;
-TXID = 2;
-RXID = 1;
+TXID = 1;
+RXID = 2;
 
 %% Parameters
 resend = 1;
@@ -95,16 +95,8 @@ pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOff
 symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
-
-%txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
-%rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
-
-
-%coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
-%symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
-%carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',16,'RolloffFactor',0.5,'FilterSpanInSymbols',8);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',16,RolloffFactor=0.5,FilterSpanInSymbols=8,DecimationFactor=1);
 
 %errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
@@ -223,7 +215,7 @@ frameTxOut = MessageBits; %frame
 
 
 %% modululate from real to imaginary numbers and add preamble
-modulateTxIn = [CRCtxOut;zeros(64, 1);]; %%ScramblerTXout;
+modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
 
 if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
@@ -232,8 +224,9 @@ end
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 
-padding = zeros(14000, 1);
-modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
+tail = qpskmod(zeros(8*2, 1));
+
+modSig = [tail; ImPreamble; msg; tail; ]; %make signal imaginary
 
 
 
@@ -436,7 +429,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
+constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
