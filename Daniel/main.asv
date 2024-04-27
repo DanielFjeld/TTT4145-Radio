@@ -92,8 +92,8 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
 pMeanFreqOff = 0;
 pCnt = 0;
-pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=80000*8, MaximumFrequencyOffset=5e3);
-pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000*8);
+pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=80000, MaximumFrequencyOffset=5e3);
+pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000*16);
 symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
@@ -252,22 +252,21 @@ end
 %% ---- Receiver ----
 
 %agcData = agc(rx());
-rx_temp = rx();
 
-[~, freqOffsetEst] = pCoarseFreqEstimator(rx_temp);   % Coarse frequency offset estimation
+if(Simulate == false)
+    filteredData = rxfilter(rx());
+else
+    filteredData = rxfilter(rxSig);
+end
+
+[~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
             %pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
-coarseFreq = pCoarseFreqCompensator(rx_temp,-freqOffsetEst);   
-
-if(Simulate == false)
-    filteredData = rxfilter(coarseFreq);
-else
-    filteredData = rxfilter(rxSig);
-end
+coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
 %coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
