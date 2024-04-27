@@ -5,9 +5,9 @@ clear all;
 
 Message = '*';
 
-NODE = 0;
+NODE = 1;
 TXID = 2;
-RXID = 2;
+RXID = 1;
 
 %% Parameters
 resend = 1;
@@ -21,6 +21,10 @@ message_ID = 0;
 Message_ID_size = 2;
 rx_last_val = 0;
 
+freq_comp_var = 0;
+startup = 1;
+
+
 Number_size = 7; %int8_t
 %Number = 69; %number to be sent
 
@@ -30,6 +34,8 @@ TX_LOOP = false;
 
 MessageLength = strlength(Message); 
 SamplesPerSymbol = 12;
+
+
 
 
 %% Setup
@@ -43,7 +49,7 @@ tx_repeat = 1;
 %frequenzy = 916MHz
 
 Freq1 = 916.0e6;
-Freq2 = 916.0e6;
+Freq2 = 916.8e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -92,9 +98,9 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
 pMeanFreqOff = 0;
 pCnt = 0;
-pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=80000*8, MaximumFrequencyOffset=5e3);
+pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","FFT-based",SampleRate=80000*8, MaximumFrequencyOffset=5e3);
 pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000*8);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=5.4,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',8,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
@@ -242,10 +248,12 @@ txData = txfilter(modSig);
 
 if(transmitt_message && tx_repeat)
    %eyediagram(txData,2*8);
-   tx_repeat = 0;
+   
    transmitt_message = 0;
-   %tx(txData);
-   tx.transmitRepeat(txData);
+   tx(txData);
+
+   %tx_repeat = 0;
+   %tx.transmitRepeat(txData);
    %while(1)
    %end
 end
@@ -253,15 +261,25 @@ end
 
 %agcData = agc(rx());
 rx_temp = rx();
+if(startup)
+    %freq1 = rx_temp;
+    %freq2 = rx_temp;
+    %freq3 = rx_temp;
+    %freq4 = rx_temp;
+    %freq5 = rx_temp;
+    %freq0 = [freq1; freq2; freq3; freq4; freq5;];
 
-[~, freqOffsetEst] = pCoarseFreqEstimator(rx_temp);   % Coarse frequency offset estimation
+    [~, freqOffsetEst] = pCoarseFreqEstimator(rx_temp);   % Coarse frequency offset estimation
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            %pCnt = pCnt + 1;            % update state
+            pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
-            
-coarseFreq = pCoarseFreqCompensator(rx_temp,-freqOffsetEst);   
+            freqOffsetEst
+            freq_comp_var = freqOffsetEst;
+
+end
+coarseFreq = pCoarseFreqCompensator(rx_temp, -freq_comp_var); 
 
 if(Simulate == false)
     filteredData = rxfilter(coarseFreq);
@@ -366,7 +384,18 @@ if(RX_LOOP)
 
         if(NODE)
             if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val)
+                startup = 0;
+
+                [~, freqOffsetEst] = pCoarseFreqEstimator(rx_temp);   % Coarse frequency offset estimation
+                % average coarse frequency offset estimate, so that carrier
+                % sync is able to lock/converge
+                freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
+                pCnt = pCnt + 1;            % update state
+                pMeanFreqOff = freqOffsetEst;
+                freq_comp_var = freqOffsetEst;
+    
                 rx_last_val = rx_message_id;
+
                 formatSpec = '%s';
                 fprintf(formatSpec, decodedMessage);
             
@@ -376,10 +405,20 @@ if(RX_LOOP)
             end
         end
         if(~NODE && errFlag == 0 && rx_number == RXID)
+            startup = 0;
+
+            [~, freqOffsetEst] = pCoarseFreqEstimator(rx_temp);   % Coarse frequency offset estimation
+            % average coarse frequency offset estimate, so that carrier
+            % sync is able to lock/converge
+            freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
+            pCnt = pCnt + 1;            % update state
+            pMeanFreqOff = freqOffsetEst;
+            freq_comp_var = freqOffsetEst;
+
             rx_last_val = rx_message_id;
             formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
             fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
-            eyediagram(coarseFreq(1:400),2*8);
+            %eyediagram(filteredData,2*8);
             if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID);
                 ack = 1;
             end
