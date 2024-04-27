@@ -51,8 +51,8 @@ else
  rx.CenterFrequency = Freq2;
 end
 
-rx.BasebandSampleRate = 120000;
-rx.SamplesPerFrame = 11226;
+rx.BasebandSampleRate = 80000*8;
+rx.SamplesPerFrame = 20000;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
 if(NODE)
@@ -62,8 +62,8 @@ else
 end
 
 tx.Gain = 0;
-tx.BasebandSampleRate = 120000;
-tx.SamplesPerFrame = 11226;
+tx.BasebandSampleRate = 80000*8;
+tx.SamplesPerFrame = 20000;
 
 %% Constellation diagrams
 constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
@@ -90,13 +90,13 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
 pMeanFreqOff = 0;
 pCnt = 0;
-pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=400000);
-pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",400000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=120000*4);
+pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",120000*4);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',8,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',8,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
@@ -223,7 +223,7 @@ frameTxOut = MessageBits; %frame
 
 
 %% modululate from real to imaginary numbers and add preamble
-modulateTxIn = [CRCtxOut;zeros(64, 1);]; %%ScramblerTXout;
+modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
 
 if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
@@ -241,10 +241,10 @@ txData = txfilter(modSig); %lp filter (make transitions smooth)
 
 if(transmitt_message)
    transmitt_message = 0;
-   tx(txData);
-   %tx.transmitRepeat(txData);
-   %while(1)
-   %end
+   %htx(txData);
+   tx.transmitRepeat(txData);
+   while(1)
+   end
 end
 %% ---- Receiver ----
 
