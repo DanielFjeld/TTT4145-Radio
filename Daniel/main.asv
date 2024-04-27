@@ -93,7 +93,7 @@ pCnt = 0;
 pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=1000000, FrequencyResolution = 10);
 pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",400000);
 symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=0.7,NormalizedLoopBandwidth=0.01);
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=1,DampingFactor=0.7,NormalizedLoopBandwidth=0.01);
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',8,'RolloffFactor',0.5,'FilterSpanInSymbols',12);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',8,RolloffFactor=0.5,FilterSpanInSymbols=12,DecimationFactor=1);
@@ -256,14 +256,14 @@ else
     filteredData = rxfilter(rxSig);
 end
 
-[coarseFreq, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
+[~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
             %pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
-%coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
+coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
 %coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
