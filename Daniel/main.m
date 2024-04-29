@@ -1,15 +1,22 @@
 %%coments
 % %% will give a new line to split up code
 % clear all, will clear persistant variables wich may be stuck after last compile
+
+% BER one way
+% package loss one way
+% PER two way
+
+% 
+
 clear all;
 
 Message = '*';
 
 NODE = 1;
-TXID = 1;
-RXID = 2;
+TXID = 2;
+RXID = 1;
 
-continous = false;
+continous = 1;
 
 %% Parameters
 resend = 1;
@@ -54,7 +61,7 @@ else
  rx.CenterFrequency = Freq2;
 end
 
-rx.BasebandSampleRate = 80000*8;
+rx.BasebandSampleRate = 80000*2;
 rx.SamplesPerFrame = 20000;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
@@ -65,7 +72,7 @@ else
 end
 
 tx.Gain = 0;
-tx.BasebandSampleRate = 80000*8;
+tx.BasebandSampleRate = 80000*2;
 tx.SamplesPerFrame = 20000;
 
 %% Constellation diagrams
@@ -95,11 +102,11 @@ pMeanFreqOff = 0;
 pCnt = 0;
 pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=120000*4);
 pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",120000*4);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
-carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=8,DampingFactor=1,NormalizedLoopBandwidth=0.01);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
+carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=1,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',8,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',8,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
@@ -164,7 +171,6 @@ while(RX_LOOP)
 end
 if(NODE == 1 && ack == 1)
     count = count + 1;
-    count2 = count2 + 1;
     ack = 0;
     transmitt_message = 1;
     message_ID = rx_message_id;
@@ -242,11 +248,11 @@ modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
-if(transmitt_message && ~continous)
+if(transmitt_message && (~continous || NODE))
    transmitt_message = 0;
    tx(txData);
 end
-if(continous && starting_continous)
+if(continous && starting_continous && ~NODE)
     starting_continous = 0;
     tx.transmitRepeat(txData)
 end
@@ -262,15 +268,14 @@ else
     filteredData = rxfilter(rxSig);
 end
 
-[~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
+[coarseFreq, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            %pCnt = pCnt + 1;            % update state
+            pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
-coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
-%coarseFreq = coarseFrequencyCompensator(filteredData); %frequency correction
+%coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
 %synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
@@ -357,21 +362,37 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 %% ---- Error calculation ---- ack = 1;
 if(RX_LOOP)
-    if(amp > 1 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
+    if(amp > 5)
+        count2 = count2 + 1;
+    end
+    if(amp > 5 && size(rxOutTemp, 1) > EOF)
+        BER = 0;
+        %count2 = count2 + 1;
+        for i = 1:size(CRCrxIn, 1)
+            if(CRCrxIn(i) ~= modulateTxIn(1))
+                BER = BER + 1;
+            end
+        end
+
         if(errFlag)
         else
             CRCok = CRCok +1;
         end
-        %rate = 1/count2;
         rate2 = CRCok/count;
+        rate3 = CRCok/count2;
         
 
         if(NODE)
-            if(errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
+            
+            if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val && ~continous)
                 rx_last_val = rx_message_id;
                 formatSpec = '%s';
                 fprintf(formatSpec, decodedMessage);
-            
+            end
+            if(continous)
+                rx_last_val = rx_message_id;
+                formatSpec = '%s BER:%f PER:%f success:%d failed:%d RX:%d freq:%d\n';
+                fprintf(formatSpec, decodedMessage, BER/25, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst);
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
@@ -379,8 +400,8 @@ if(RX_LOOP)
         end
         if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val && true || continous))
             rx_last_val = rx_message_id;
-            formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d\n';
-            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id);
+            formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
+            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, BER);
             if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
                 ack = 1;
             end
@@ -434,7 +455,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
+constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
