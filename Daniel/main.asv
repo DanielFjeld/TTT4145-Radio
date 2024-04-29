@@ -5,11 +5,11 @@ clear all;
 
 Message = '*';
 
-NODE = 1;
-TXID = 1;
-RXID = 2;
+NODE = 0;
+TXID = 2;
+RXID = 1;
 
-continous = false;
+continous = true;
 
 %% Parameters
 resend = 1;
@@ -355,7 +355,7 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 
 
 
-%% ---- Error calculation ---- ack = 1;
+%% ---- Error calculation ----
 if(RX_LOOP)
     if(amp > 1 && size(rxOutTemp, 1) > EOF && rx_number == RXID)
         if(errFlag)
