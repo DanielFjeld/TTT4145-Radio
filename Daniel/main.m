@@ -23,8 +23,9 @@ else
 end
 
 
-continous = 1;
-barker_test = 1;
+continous = 0;
+barker_test = 0;
+
 
 %% Parameters
 resend = 1;
@@ -53,8 +54,15 @@ SamplesPerSymbol = 8;
 
 count = 0;
 count2 = 0;
+count4 = 0;
 CRCok = 0;
 starting_continous = 1;
+barker_send_count = 100;
+
+n = 7000; % However many numbers you want.
+padding = randi([0, 1], [n, 1]);
+%padding = zeros(7000, 1);
+
 
 %frequenzy = 916MHz
 
@@ -81,7 +89,6 @@ end
 
 tx.Gain = 0;
 tx.BasebandSampleRate = 80000*2;
-tx.SamplesPerFrame = 20000;
 
 %% Constellation diagrams
 constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
@@ -108,8 +115,8 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 
 pMeanFreqOff = 0;
 pCnt = 0;
-pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=120000*4);
-pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",120000*4);
+pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=80000);
+pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000);
 symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=1,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
@@ -150,24 +157,39 @@ while(RX_LOOP)
 
  if(NODE == 0)
     if(toc > 0.05) %&& ack == 1
-      if(ack)
-          while(~message_index)
-              count = 0;
-              CRCok = 0;
-              prompt = "Input:";
-              text_input = input(prompt, "s");
-              message_index = strlength(text_input)+1;
-              message_index_size = message_index;
-              text_input_char_arr = [char(text_input), char(10)];
+      if(ack || (barker_test && count >= barker_send_count))
+          while(~message_index || (barker_test && count >= barker_send_count))
+              if(~barker_test)
+                  count = 0;
+                  CRCok = 0;
+                  prompt = "Input:";
+                  text_input = input(prompt, "s");
+                  message_index = strlength(text_input)+1;
+                  message_index_size = message_index;
+                  text_input_char_arr = [char(text_input), char(10)];
+              else
+                  message_index = 1;
+                  count = 0;
+                  count4 = 0;
+                  prompt = "Input:";
+                  text_input = input(prompt, "s");
+              end
+
           end
-          Message = text_input_char_arr(message_index_size - message_index + 1);
-          message_index = message_index - 1;
-          if(message_index < 0)
+          if(barker_test)
+              Message = 'U';
               message_ID = 0;
-          end
-          message_ID = message_ID + 1;
-          if(message_ID == 4)
-              message_ID = 0;
+          else
+              Message = text_input_char_arr(message_index_size - message_index + 1);
+              message_index = message_index - 1;
+              if(message_index < 0)
+                  message_ID = 0;
+              end
+              message_ID = message_ID + 1;
+              if(message_ID == 4)
+                  message_ID = 0;
+              end
+          
           end
       end
       ack = 0;
@@ -240,17 +262,19 @@ frameTxOut = MessageBits; %frame
 
 
 %% modululate from real to imaginary numbers and add preamble
+%padding = zeros(14000, 1);
+
 modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
 
 if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
     modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
 end
-
+trail = qpskmod(padding);
 msg = qpskmod(modulateTxIn);
 msg = msg*sqrt(2);
 
-padding = zeros(14000, 1);
-modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
+
+modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
 
 
 
@@ -276,14 +300,14 @@ else
     filteredData = rxfilter(rxSig);
 end
 
-[coarseFreq, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
+[~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            pCnt = pCnt + 1;            % update state
+            %pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
-%coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
+coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
 %synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
@@ -371,12 +395,14 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 %% ---- Error calculation ---- ack = 1;
 if(RX_LOOP)
     if(amp > 5)
-        count2 = count2 + 1;        
+        count2 = count2 + 1; 
+        count4 = count4 + 1;        
         if(barker_test)
             ack = 1;
             if(~NODE)
-                formatSpec = 'PER%d Count%d\n';
-                fprintf(formatSpec, 1, count);
+                PER = count4/count;
+                formatSpec = 'sent:%d recived:%d PER:%f\n';
+                fprintf(formatSpec, count, count4, PER);
             else
                 formatSpec = 'Count%d\n';
                 fprintf(formatSpec, count);
@@ -473,7 +499,7 @@ end
 %constDiagram1(txData)
 %constDiagram2(filteredData)
 %constDiagram3(coarseFreq)
-constDiagram4(synchronizedCarrier)
+%constDiagram4(synchronizedCarrier)
 %constDiagram5(synchronizedSymbol) %dont know what this is
 
 if(TX_LOOP)
