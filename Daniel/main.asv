@@ -12,7 +12,7 @@ clear all;
 
 Message = '*';
 
-NODE = 0;
+NODE = 1;
 
 if(NODE)
     TXID = 2;
@@ -24,7 +24,6 @@ end
 
 
 continous = 1;
-barker_test = 1;
 
 %% Parameters
 resend = 1;
@@ -256,11 +255,11 @@ modSig = [msg; ImPreamble; msg; msg; ]; %make signal imaginary
 
 txData = txfilter(modSig); %lp filter (make transitions smooth)
 
-if(transmitt_message && (~continous | NODE | barker_test))
+if(transmitt_message && (~continous | NODE))
    transmitt_message = 0;
    tx(txData);
 end
-if(continous && starting_continous && ~NODE && ~barker_test)
+if(continous && starting_continous && ~NODE)
     starting_continous = 0;
     tx.transmitRepeat(txData)
 end
@@ -371,15 +370,12 @@ decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed i
 %% ---- Error calculation ---- ack = 1;
 if(RX_LOOP)
     if(amp > 5)
-        count2 = count2 + 1;        
+        count2 = count2 + 1;
         if(barker_test)
             ack = 1;
             if(~NODE)
                 formatSpec = 'PER%d Count%d\n';
-                fprintf(formatSpec, 1, count);
-            else
-                formatSpec = 'Count%d\n';
-                fprintf(formatSpec, count);
+                fprintf(formatSpec, d);
             end
         end
     end
