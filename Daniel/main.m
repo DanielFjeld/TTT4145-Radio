@@ -13,7 +13,7 @@ clear all;
 Message = '*';
 
 
-NODE = 1;
+NODE = 0;
 continous = 0;
 barker_test = 0;
 
@@ -66,6 +66,7 @@ SamplesPerSymbol = 8;
 count = 0;
 count2 = 0;
 count4 = 0;
+count5 = 0;
 CRCok = 0;
 starting_continous = 1;
 barker_send_count = 100;
@@ -430,7 +431,7 @@ if(RX_LOOP)
     if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
         if(NODE) %BER test
             test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
-            [number,ratio] = biterr(test,CRCrxIn)
+            [number,ratio] = biterr(test,CRCrxIn);
             count5 = count5+1;
             BER = BER + ratio;
             BER_acc = BER/count5;
@@ -453,8 +454,8 @@ if(RX_LOOP)
             end
             if(continous)
                 rx_last_val = rx_message_id;
-                formatSpec = '%s BER:%f PER:%f success:%d failed:%d RX:%d freq:%d BER: %f\n';
-                fprintf(formatSpec, decodedMessage, BER/25, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc);
+                formatSpec = '%s PER:%f success:%d failed:%d RX:%d freq:%d BER: %f\n';
+                fprintf(formatSpec, decodedMessage, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc);
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
