@@ -13,8 +13,8 @@ clear all;
 Message = '*';
 
 
-NODE = 0;
-continous = 1;
+NODE = 1;
+continous = 0;
 barker_test = 0;
 
 
@@ -69,6 +69,9 @@ count4 = 0;
 CRCok = 0;
 starting_continous = 1;
 barker_send_count = 100;
+
+BER_acc = 0;
+BER = 0;
 
 n = 40; % However many numbers you want.
 padding = randi([0, 1], [n, 1]);
@@ -426,20 +429,13 @@ if(RX_LOOP)
     end
     if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
         if(NODE) %BER test
-            test = [0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,1,0,0,0,0,1,1,1,1,0,0];
-            [number,ratio] = biterr(test,y)
-
-            
+            test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
+            [number,ratio] = biterr(test,CRCrxIn)
+            count5 = count5+1;
+            BER = BER + ratio;
+            BER_acc = BER/count5;
         end
         
-        BER = 0;
-        %count2 = count2 + 1;
-        for i = 1:size(CRCrxIn, 1)
-            if(CRCrxIn(i) ~= modulateTxIn(1))
-                BER = BER + 1;
-            end
-        end
-
         if(errFlag)
         else
             CRCok = CRCok +1;

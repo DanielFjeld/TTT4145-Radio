@@ -70,6 +70,9 @@ CRCok = 0;
 starting_continous = 1;
 barker_send_count = 100;
 
+BER_acc = 0;
+BER = 0;
+
 n = 40; % However many numbers you want.
 padding = randi([0, 1], [n, 1]);
 %padding = zeros(7000, 1);
@@ -428,16 +431,11 @@ if(RX_LOOP)
         if(NODE) %BER test
             test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
             [number,ratio] = biterr(test,CRCrxIn)
+            count5 = count5+1;
+            BER = BER + ratio;
+            BER_acc = BER/count5;
         end
         
-        BER = 0;
-        %count2 = count2 + 1;
-        for i = 1:size(CRCrxIn, 1)
-            if(CRCrxIn(i) ~= modulateTxIn(1))
-                BER = BER + 1;
-            end
-        end
-
         if(errFlag)
         else
             CRCok = CRCok +1;
@@ -455,8 +453,8 @@ if(RX_LOOP)
             end
             if(continous)
                 rx_last_val = rx_message_id;
-                formatSpec = '%s BER:%f PER:%f success:%d failed:%d RX:%d freq:%d\n';
-                fprintf(formatSpec, decodedMessage, BER/25, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst);
+                formatSpec = '%s BER:%f PER:%f success:%d failed:%d RX:%d freq:%d BER: %f\n';
+                fprintf(formatSpec, decodedMessage, BER/25, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc);
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
@@ -465,7 +463,7 @@ if(RX_LOOP)
         if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
             rx_last_val = rx_message_id;
             formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
-            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, BER);
+            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, 1);
             if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
                 ack = 1;
             end
