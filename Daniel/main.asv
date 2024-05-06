@@ -14,7 +14,7 @@ Message = '*';
 
 
 NODE = 0;
-continous = 0;
+continous = 1;
 barker_test = 0;
 
 
@@ -78,7 +78,7 @@ padding = randi([0, 1], [n, 1]);
 %frequenzy = 916MHz
 
 Freq1 = 916.0e6;
-Freq2 = 916.3e6;
+Freq2 = 924.3e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -318,11 +318,11 @@ end
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
             pCnt = pCnt + 1;            % update state
-            pMeanFreqOff = freqOffsetEst
+            pMeanFreqOff = freqOffsetEst;
             
 %coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);  
 
-coarseFreq = pCoarseFreqCompensator(filteredData,freq_offset);     
+coarseFreq = pCoarseFreqCompensator(filteredData,-pMeanFreqOff);     
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
 %synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
@@ -425,6 +425,13 @@ if(RX_LOOP)
         end
     end
     if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
+        if(NODE) %BER test
+            test = [0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,1,0,0,0,0,1,1,1,1,0,0];
+            [number,ratio] = biterr(test,y)
+
+            
+        end
+        
         BER = 0;
         %count2 = count2 + 1;
         for i = 1:size(CRCrxIn, 1)
