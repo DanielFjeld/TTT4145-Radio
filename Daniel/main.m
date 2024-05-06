@@ -13,8 +13,8 @@ clear all;
 Message = '*';
 
 
-NODE = 0;
-continous = 1;
+NODE = 1;
+continous = 0;
 barker_test = 0;
 
 
@@ -426,7 +426,7 @@ if(RX_LOOP)
     end
     if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
         if(NODE) %BER test
-            test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0,0;0;0;1;0];
+            test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
             [number,ratio] = biterr(test,CRCrxIn)
         end
         
