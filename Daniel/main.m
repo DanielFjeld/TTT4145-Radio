@@ -12,22 +12,33 @@ clear all;
 
 Message = '*';
 
+
 NODE = 0;
-
-if(NODE)
-    TXID = 2;
-    RXID = 1;
-else
-    TXID = 1;
-    RXID = 2;
-end
-
-
 continous = 0;
 barker_test = 0;
 
 
+sps = 2;
+passband = 200000*sps;
+
+
 %% Parameters
+freq_offset = 0;
+
+if(NODE)
+    TXID = 2;
+    RXID = 1;
+    freq_offset = -750;
+else
+    TXID = 1;
+    RXID = 2;
+    freq_offset = +1500;
+end
+
+
+
+
+
 resend = 1;
 if(NODE)
     Message = 'C';
@@ -59,7 +70,7 @@ CRCok = 0;
 starting_continous = 1;
 barker_send_count = 100;
 
-n = 7000; % However many numbers you want.
+n = 40; % However many numbers you want.
 padding = randi([0, 1], [n, 1]);
 %padding = zeros(7000, 1);
 
@@ -67,7 +78,7 @@ padding = randi([0, 1], [n, 1]);
 %frequenzy = 916MHz
 
 Freq1 = 916.0e6;
-Freq2 = 916.3e6;
+Freq2 = 924.3e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -77,7 +88,9 @@ else
  rx.CenterFrequency = Freq2;
 end
 
-rx.BasebandSampleRate = 80000*2;
+
+
+rx.BasebandSampleRate = passband;
 rx.SamplesPerFrame = 20000;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
@@ -88,7 +101,7 @@ else
 end
 
 tx.Gain = 0;
-tx.BasebandSampleRate = 80000*2;
+tx.BasebandSampleRate = passband;
 
 %% Constellation diagrams
 constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
@@ -116,12 +129,12 @@ qpskdemod = comm.QPSKDemodulator('BitOutput',true);
 pMeanFreqOff = 0;
 pCnt = 0;
 pCoarseFreqEstimator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",SampleRate=80000);
-pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000);
-symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
+pCoarseFreqCompensator = comm.PhaseFrequencyOffset("PhaseOffset",0,"FrequencyOffsetSource","Input port","SampleRate",80000*sps);
+symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=sps,DampingFactor=1,NormalizedLoopBandwidth=0.01,DetectorGain=2.7,Modulation="PAM/PSK/QAM");
 carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=1,DampingFactor=1,NormalizedLoopBandwidth=0.01);
 
-txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',2,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
-rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',2,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
+txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',sps,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
+rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',sps,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
 %txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
 %rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
@@ -304,10 +317,12 @@ end
             % average coarse frequency offset estimate, so that carrier
             % sync is able to lock/converge
             freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            %pCnt = pCnt + 1;            % update state
+            pCnt = pCnt + 1;            % update state
             pMeanFreqOff = freqOffsetEst;
             
-coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);     
+%coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);  
+
+coarseFreq = pCoarseFreqCompensator(filteredData,-pMeanFreqOff);     
 
 synchronizedSymbol = symbolSynchronizer(coarseFreq);
 %synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
@@ -442,7 +457,7 @@ if(RX_LOOP)
                 ack = 1;
             end
         end
-        if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val && true || continous))
+        if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
             rx_last_val = rx_message_id;
             formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
             fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, BER);
