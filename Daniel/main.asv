@@ -14,8 +14,9 @@ Message = '*';
 
 
 NODE = 1;
-continous = 0;
+continous = 1;
 barker_test = 0;
+BER_test = 1;
 
 
 sps = 2;
@@ -66,11 +67,13 @@ SamplesPerSymbol = 8;
 count = 0;
 count2 = 0;
 count4 = 0;
+count5 = 0;
 CRCok = 0;
 starting_continous = 1;
 barker_send_count = 100;
 
 BER_acc = 0;
+BER_bits = 0;
 BER = 0;
 
 n = 40; % However many numbers you want.
@@ -162,7 +165,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 
-ImPreamble = Preamble+Preamble*i;
+ImPreamble = Preamble/sqrt(2)+Preamble*i/sqrt(2);
 
 ack = 1;
 transmitt_message = 0;
@@ -287,7 +290,7 @@ if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol
 end
 trail = qpskmod(padding);
 msg = qpskmod(modulateTxIn);
-msg = msg*sqrt(2);
+msg = msg; %*sqrt(2);
 
 
 modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
@@ -430,8 +433,9 @@ if(RX_LOOP)
     if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
         if(NODE) %BER test
             test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
-            [number,ratio] = biterr(test,CRCrxIn)
+            [number,ratio] = biterr(test,CRCrxIn);
             count5 = count5+1;
+            BER_bits = BER_bits + number;
             BER = BER + ratio;
             BER_acc = BER/count5;
         end
@@ -453,8 +457,8 @@ if(RX_LOOP)
             end
             if(continous)
                 rx_last_val = rx_message_id;
-                formatSpec = '%s BER:%f PER:%f success:%d failed:%d RX:%d freq:%d\n';
-                fprintf(formatSpec, decodedMessage, BER/25, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst);
+                formatSpec = '%s PER:%f success:%d failed:%d RX:%d freq:%d BER: %f BER bits:%d\n';
+                fprintf(formatSpec, decodedMessage, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc, BER_bits);
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
@@ -463,8 +467,8 @@ if(RX_LOOP)
         if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
             rx_last_val = rx_message_id;
             formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
-            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, BER);
-            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
+            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, 1);
+            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID && ~BER_test)
                 ack = 1;
             end
         end

@@ -13,9 +13,10 @@ clear all;
 Message = '*';
 
 
-NODE = 0;
+NODE = 1;
 continous = 1;
 barker_test = 0;
+BER_test = 1;
 
 
 sps = 2;
@@ -164,7 +165,7 @@ bar = barker();
 Preamble = [bar; bar;];
 
 
-ImPreamble = Preamble+Preamble*i;
+ImPreamble = Preamble/sqrt(2)+Preamble*i/sqrt(2);
 
 ack = 1;
 transmitt_message = 0;
@@ -289,7 +290,7 @@ if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol
 end
 trail = qpskmod(padding);
 msg = qpskmod(modulateTxIn);
-msg = msg*sqrt(2);
+msg = msg; %*sqrt(2);
 
 
 modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
@@ -467,7 +468,7 @@ if(RX_LOOP)
             rx_last_val = rx_message_id;
             formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
             fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, 1);
-            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID)
+            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID && ~BER_test)
                 ack = 1;
             end
         end
