@@ -115,11 +115,13 @@ constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
 constDiagram2 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','filteredData');
 constDiagram3 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000,'Title','agcData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000,'Title','phaseTxOut');
 constDiagram4 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000, 'Title','synchronizedSymbol');
 constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000);
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000, 'Title','synchronizedCarrier');
+
+
 
 %% Channel
 channel = comm.AWGNChannel('EbNo',20,'BitsPerSymbol',2);
@@ -518,11 +520,11 @@ formatSpec = '%s%d\n';
 fprintf(formatSpec, decodedMessage, rx_number);
 end
 %% print diagrams
-%constDiagram1(txData)
-%constDiagram2(filteredData)
-%constDiagram3(coarseFreq)
-%constDiagram4(synchronizedCarrier)
-%constDiagram5(synchronizedSymbol) %dont know what this is
+%constDiagram1(filteredData*5)
+%constDiagram2(coarseFreq*5)
+%constDiagram3(phaseTxOut*5)
+%constDiagram4(synchronizedSymbol*5)
+%constDiagram5(synchronizedCarrier*5) %dont know what this is
 
 if(TX_LOOP)
 else
