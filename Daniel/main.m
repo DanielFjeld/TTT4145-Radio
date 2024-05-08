@@ -13,10 +13,11 @@ clear all;
 Message = '*';
 
 
-NODE = 1;
+NODE = 0;
 continous = 1;
 barker_test = 0;
 BER_test = 0;
+eye_test = 1;
 
 
 sps = 4;
@@ -292,6 +293,9 @@ if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol
 end
 trail = qpskmod(padding);
 msg = qpskmod(modulateTxIn);
+if(eye_test)
+    msg = qpskmod([0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1;0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1;0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1]);
+end
 msg = msg; %*sqrt(2);
 
 
@@ -465,6 +469,8 @@ if(RX_LOOP)
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
+            end
+            if(eye_test)
                 eyediagram(coarseFreq(1+preambleIndex:25*sps+preambleIndex), 2*sps)
             end
         end
