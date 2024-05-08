@@ -16,10 +16,10 @@ Message = '*';
 NODE = 1;
 continous = 1;
 barker_test = 0;
-BER_test = 1;
+BER_test = 0;
 
 
-sps = 2;
+sps = 4;
 passband = 200000*sps;
 
 
@@ -456,6 +456,7 @@ if(RX_LOOP)
                 rx_last_val = rx_message_id;
                 formatSpec = '%s';
                 fprintf(formatSpec, decodedMessage);
+                
             end
             if(continous)
                 rx_last_val = rx_message_id;
@@ -464,6 +465,7 @@ if(RX_LOOP)
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
+                eyediagram(coarseFreq(1+preambleIndex:25*sps+preambleIndex), 2*sps)
             end
         end
         if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
