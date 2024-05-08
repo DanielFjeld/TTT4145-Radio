@@ -13,14 +13,14 @@ clear all;
 Message = '*';
 
 
-NODE = 0;
+NODE = 1;
 continous = 1;
 barker_test = 0;
 BER_test = 0;
-eye_test = 1;
+eye_test = 0;
 
 
-sps = 4;
+sps = 2;
 passband = 200000*sps;
 
 
@@ -84,8 +84,8 @@ padding = randi([0, 1], [n, 1]);
 
 %frequenzy = 916MHz
 
-Freq1 = 916.0e6;
-Freq2 = 924.3e6;
+Freq1 = 916.3e6;
+Freq2 = 917.5e6;
 
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
@@ -112,15 +112,15 @@ tx.BasebandSampleRate = passband;
 
 %% Constellation diagrams
 constDiagram1 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000,'Title','txData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000,'Title','filteredData');
 constDiagram2 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',100,'Title','filteredData');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000,'Title','coarseFreq');
 constDiagram3 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000,'Title','phaseTxOut');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000,'Title','phaseTxOut');
 constDiagram4 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000, 'Title','synchronizedSymbol');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000, 'Title','synchronizedSymbol');
 constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
-    'SymbolsToDisplaySource','Property','SymbolsToDisplay',30000, 'Title','synchronizedCarrier');
+    'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000, 'Title','synchronizedCarrier');
 
 
 
@@ -464,8 +464,8 @@ if(RX_LOOP)
             end
             if(continous)
                 rx_last_val = rx_message_id;
-                formatSpec = '%s PER:%f success:%d failed:%d RX:%d freq:%d BER: %f BER bits:%d\n';
-                fprintf(formatSpec, decodedMessage, 1-rate3, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc, BER_bits);
+                formatSpec = '%s PER:%f count%d success:%d failed:%d RX:%d freq:%d BER: %f BER bits:%d\n';
+                fprintf(formatSpec, decodedMessage, 1-rate3, count2, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc, BER_bits);
             end
             if(errFlag == 0 && rx_number == RXID)
                 ack = 1;
