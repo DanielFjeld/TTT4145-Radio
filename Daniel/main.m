@@ -1,13 +1,3 @@
-%%coments
-% %% will give a new line to split up code
-% clear all, will clear persistant variables wich may be stuck after last compile
-
-% BER one way
-% package loss one way
-% PER two way
-
-% 
-
 clear all;
 
 Message = '*';
@@ -36,10 +26,6 @@ else
     RXID = 2;
     freq_offset = +1500;
 end
-
-
-
-
 
 resend = 1;
 if(NODE)
@@ -95,8 +81,6 @@ else
  rx.CenterFrequency = Freq2;
 end
 
-
-
 rx.BasebandSampleRate = passband;
 rx.SamplesPerFrame = 20000;
 % Setup Transmitter
@@ -122,8 +106,6 @@ constDiagram4 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, .
 constDiagram5 = comm.ConstellationDiagram('SamplesPerSymbol',SamplesPerSymbol, ...
     'SymbolsToDisplaySource','Property','SymbolsToDisplay',3000, 'Title','synchronizedCarrier');
 
-
-
 %% Channel
 channel = comm.AWGNChannel('EbNo',20,'BitsPerSymbol',2);
 pfo = comm.PhaseFrequencyOffset( ...
@@ -145,15 +127,6 @@ carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPh
 txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',sps,'RolloffFactor',0.5,'FilterSpanInSymbols',10);
 rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',sps,RolloffFactor=0.5,FilterSpanInSymbols=10,DecimationFactor=1);
 
-%txfilter = comm.RaisedCosineTransmitFilter('OutputSamplesPerSymbol',SamplesPerSymbol,'RolloffFactor',0.5);
-%rxfilter = comm.RaisedCosineReceiveFilter('InputSamplesPerSymbol',SamplesPerSymbol,'DecimationFactor',SamplesPerSymbol,RolloffFactor=0.5);
-
-
-%coarseFrequencyCompensator = comm.CoarseFrequencyCompensator("Modulation","QPSK","Algorithm","Correlation-based",MaximumFrequencyOffset=6e3,SampleRate=200000);
-%symbolSynchronizer = comm.SymbolSynchronizer("TimingErrorDetector","Gardner (non-data-aided)",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
-%carrierSynchronizer = comm.CarrierSynchronizer("Modulation","QPSK","ModulationPhaseOffset","Auto",SamplesPerSymbol=2,DampingFactor=1,NormalizedLoopBandwidth=0.01);
-
-%errorRate = comm.ErrorRate('ReceiveDelay',2);
 agc = comm.AGC();
 agc.DesiredOutputPower = 1;
 agc.AveragingLength = 50;
@@ -235,9 +208,6 @@ for msgCnt = 0 : resend-1
     msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
         sprintf('%s', Message);
 end
-%seq = barker();
-%seq = max(0, seq); %%make barker bits between 0 and 1 
-%seq = int2bit(seq, 2);
 
 MsgTxOut = msgSet;
 MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 8);];
@@ -246,42 +216,6 @@ MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2
 CRCtxIn = MsgTxOut;
 crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
 CRCtxOut = crcGen(CRCtxIn);
-
-%% hamming encoding
-HammingTxIn = CRCtxOut;
-k = size(HammingTxIn, 1);
-r = ceil(log2(k));
-% Adjust r until the condition is met: 2^r >= k + r + 1
-while 2^r < k + r + 1
-    r = r + 1;
-end
-% Calculate the total codeword length n
-n = 2^r - 1;
-k = n - r;
-
-HammingTxOut = encode(HammingTxIn, n, k, 'hamming/binary');
-
-%% Trells encoding, Veterbi
-
-TrellisTxIn = [HammingTxOut; zeros(1,1);];
-trellis = poly2trellis([4 3],[4 5 17;7 4 2]);
-tbdepth = 5 * 3; % A common practice for traceback depth
-
-TrellisTxOut = convenc(TrellisTxIn,trellis);
-TrellisTxOut = TrellisTxIn; %%BYPASS
-
-
-%% frame 
-frameTxIn = TrellisTxOut;
-if(mod(size(frameTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    MessageBits = [frameTxIn; zeros(1, 1);]; %need to add a zero at the end
-else
-    MessageBits = frameTxIn; 
-end
-
-frameTxOut = MessageBits; %frame
-
-
 
 %% modululate from real to imaginary numbers and add preamble
 %padding = zeros(14000, 1);
@@ -293,11 +227,6 @@ if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol
 end
 trail = qpskmod(padding);
 msg = qpskmod(modulateTxIn);
-if(eye_test)
-    msg = qpskmod([0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1;0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1;0;0;1;0;0;0;1;1;0;1;1;1;0;0;1;0;0;1]);
-end
-msg = msg; %*sqrt(2);
-
 
 modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
 
@@ -371,23 +300,6 @@ rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
 
 EOF = size(TrellisTxOut, 1);
 FrameDetectOut = rxOut(1:EOF);
-
-
-%% Trells decoding, Veterbi
-TrellsRxIn = FrameDetectOut;
-%TrellsRxOut = vitdec(TrellsRxIn, trellis, tbdepth, 'trunc', 'hard'); % The last parameter specifies the number of soft decision bits
-TrellsRxOut = TrellsRxIn; %BYPASS
-
-%% hamming decoding
-%%introduse error
-%errLoc = randerr(1,n);
-%HammingDecData = mod(HammingDecData + errLoc',2);
-
-%calculation
-HammingRxIn = TrellsRxOut(1:size(HammingTxOut, 1)); %get data
-
-DetectedRxData = decode(HammingRxIn,n,k,'hamming/binary');
-HammingRxOut = DetectedRxData(1:size(CRCtxOut, 1));
 
 %% CRC check
 CRCrxIn = FrameDetectOut(1:size(CRCtxOut, 1)); %HammingRxOut;
