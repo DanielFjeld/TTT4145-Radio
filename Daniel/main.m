@@ -1,40 +1,36 @@
 clear all;
 
-Message = '*';
+NODE = 0; %1=sender 0=reciever
+continous = 0; %transmitt continous or discontionus
+barker_test = 0; %transmitting ack only based on if barker is detected
+BER_test = 0; %test BER
+eye_test = 0; %show eye diagram after recieved data.
 
 
-NODE = 1;
-continous = 1;
-barker_test = 0;
-BER_test = 0;
-eye_test = 0;
-
-
-sps = 2;
-passband = 200000*sps;
+sps = 2; %samples per second
+passband = 200000*sps; %symbols per second transmitted
 
 
 %% Parameters
-freq_offset = 0;
 
+%ease of testing node id is set automaticly but can be set if one wants to
+%use more than one pair
 if(NODE)
-    TXID = 2;
+    TXID = 2; 
     RXID = 1;
-    freq_offset = -750;
 else
     TXID = 1;
     RXID = 2;
-    freq_offset = +1500;
 end
 
-resend = 1;
+Message = '*'; %message to be transmitted (will be changed)
 if(NODE)
     Message = 'C';
 else
     Message = 'A';
 end
 
-message_ID = 0;
+message_ID = 0; 
 Message_ID_size = 2;
 rx_last_val = 0;
 
@@ -63,12 +59,8 @@ BER_acc = 0;
 BER_bits = 0;
 BER = 0;
 
-n = 40; % However many numbers you want.
+n = 40; % 40 bits/ 20 symbols for tail
 padding = randi([0, 1], [n, 1]);
-%padding = zeros(7000, 1);
-
-
-%frequenzy = 916MHz
 
 Freq1 = 916.3e6;
 Freq2 = 917.5e6;
@@ -149,7 +141,7 @@ rx_message_id = 0;
 message_index = 0;
 message_index_size = 0;
 while(RX_LOOP)
-
+    %get user input
     if(NODE == 0)
         if(toc > 0.05) %&& ack == 1
             if(ack || (barker_test && count >= barker_send_count))
@@ -202,9 +194,9 @@ while(RX_LOOP)
     end
 
     %% MessageBits
-
-    msgSet = zeros(resend * MessageLength, 1);
-    for msgCnt = 0 : resend-1
+    %restructure bits from ASCII
+    msgSet = zeros(MessageLength, 1);
+    for msgCnt = 0 : 0
         msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
             sprintf('%s', Message);
     end
@@ -218,15 +210,14 @@ while(RX_LOOP)
     CRCtxOut = crcGen(CRCtxIn);
 
     %% modululate from real to imaginary numbers and add preamble
-    %padding = zeros(14000, 1);
 
     modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
 
     if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
         modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
     end
-    trail = qpskmod(padding);
-    msg = qpskmod(modulateTxIn);
+    trail = qpskmod(padding); %modulate tail bits
+    msg = qpskmod(modulateTxIn); %modulate message
 
     modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
 
@@ -234,11 +225,11 @@ while(RX_LOOP)
 
     txData = txfilter(modSig); %lp filter (make transitions smooth)
 
-    if(transmitt_message && (~continous | NODE | barker_test))
+    if(transmitt_message && (~continous | NODE | barker_test)) %discontionus transmittion
         transmitt_message = 0;
         tx(txData);
     end
-    if(continous && starting_continous && ~NODE && ~barker_test)
+    if(continous && starting_continous && ~NODE && ~barker_test) %continous transmittion
         starting_continous = 0;
         tx.transmitRepeat(txData)
     end
@@ -295,10 +286,10 @@ while(RX_LOOP)
     else
         rxOutTemp = [zeros(1,1)];
     end
-    rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
+    rxOut = [rxOutTemp(1:end); zeros(size(CRCtxOut, 1),1)];
 
 
-    EOF = size(TrellisTxOut, 1);
+    EOF = size(CRCtxOut, 1);
     FrameDetectOut = rxOut(1:EOF);
 
     %% CRC check
@@ -319,7 +310,7 @@ while(RX_LOOP)
 
     % Extract the message bits after the Barker codes
     reshapeRxIn = FrameDetectOut(10:end); %detectedData;
-    endOfMessage = MessageLength*8*resend;
+    endOfMessage = MessageLength*8;
     messageBits = reshapeRxIn(1:endOfMessage);
 
     % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
@@ -331,12 +322,12 @@ while(RX_LOOP)
 
 
 
-    %% ---- Error calculation ---- ack = 1;
+    %% ---- Error calculation ---- 
     if(RX_LOOP)
-        if(amp > 5)
+        if(amp > 5) %detected barker
             count2 = count2 + 1;
             count4 = count4 + 1;
-            if(barker_test)
+            if(barker_test) %if testing barker send ack and print data
                 ack = 1;
                 if(~NODE)
                     PER = count4/count;
@@ -348,8 +339,8 @@ while(RX_LOOP)
                 end
             end
         end
-        if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
-            if(NODE) %BER test
+        if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test) 
+            if(NODE) %BER test with known data
                 test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
                 [number,ratio] = biterr(test,CRCrxIn);
                 count5 = count5+1;
@@ -358,10 +349,11 @@ while(RX_LOOP)
                 BER_acc = BER/count5;
             end
 
-            if(errFlag)
+            if(errFlag) %check CRC
             else
                 CRCok = CRCok +1;
             end
+
             rate2 = CRCok/count;
             rate3 = CRCok/count2;
 
