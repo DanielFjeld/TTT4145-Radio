@@ -45,7 +45,7 @@ Simulate = false;
 RX_LOOP = true;
 TX_LOOP = false;
 
-MessageLength = strlength(Message); 
+MessageLength = strlength(Message);
 SamplesPerSymbol = 8;
 
 
@@ -76,9 +76,9 @@ Freq2 = 917.5e6;
 % Setup Receiver
 rx = sdrrx('Pluto','OutputDataType','double','SamplesPerFrame',2^15);
 if(NODE)
- rx.CenterFrequency = Freq1;
-else 
- rx.CenterFrequency = Freq2;
+    rx.CenterFrequency = Freq1;
+else
+    rx.CenterFrequency = Freq2;
 end
 
 rx.BasebandSampleRate = passband;
@@ -86,9 +86,9 @@ rx.SamplesPerFrame = 20000;
 % Setup Transmitter
 tx = sdrtx('Pluto','Gain',0);
 if(NODE)
- tx.CenterFrequency = Freq2;
-else 
- tx.CenterFrequency = Freq1;
+    tx.CenterFrequency = Freq2;
+else
+    tx.CenterFrequency = Freq1;
 end
 
 tx.Gain = 0;
@@ -150,305 +150,305 @@ message_index = 0;
 message_index_size = 0;
 while(RX_LOOP)
 
- if(NODE == 0)
-    if(toc > 0.05) %&& ack == 1
-      if(ack || (barker_test && count >= barker_send_count))
-          while(~message_index || (barker_test && count >= barker_send_count))
-              if(~barker_test)
-                  count = 0;
-                  CRCok = 0;
-                  prompt = "Input:";
-                  text_input = input(prompt, "s");
-                  message_index = strlength(text_input)+1;
-                  message_index_size = message_index;
-                  text_input_char_arr = [char(text_input), char(10)];
-              else
-                  message_index = 1;
-                  count = 0;
-                  count4 = 0;
-                  prompt = "Input:";
-                  text_input = input(prompt, "s");
-              end
+    if(NODE == 0)
+        if(toc > 0.05) %&& ack == 1
+            if(ack || (barker_test && count >= barker_send_count))
+                while(~message_index || (barker_test && count >= barker_send_count))
+                    if(~barker_test)
+                        count = 0;
+                        CRCok = 0;
+                        prompt = "Input:";
+                        text_input = input(prompt, "s");
+                        message_index = strlength(text_input)+1;
+                        message_index_size = message_index;
+                        text_input_char_arr = [char(text_input), char(10)];
+                    else
+                        message_index = 1;
+                        count = 0;
+                        count4 = 0;
+                        prompt = "Input:";
+                        text_input = input(prompt, "s");
+                    end
 
-          end
-          if(barker_test)
-              Message = 'U';
-              message_ID = 0;
-          else
-              Message = text_input_char_arr(message_index_size - message_index + 1);
-              message_index = message_index - 1;
-              if(message_index < 0)
-                  message_ID = 0;
-              end
-              message_ID = message_ID + 1;
-              if(message_ID == 4)
-                  message_ID = 0;
-              end
-          
-          end
-      end
-      ack = 0;
-      tic  
-      transmitt_message = 1;
-      count2 = 1;
-      count = count + 1;
+                end
+                if(barker_test)
+                    Message = 'U';
+                    message_ID = 0;
+                else
+                    Message = text_input_char_arr(message_index_size - message_index + 1);
+                    message_index = message_index - 1;
+                    if(message_index < 0)
+                        message_ID = 0;
+                    end
+                    message_ID = message_ID + 1;
+                    if(message_ID == 4)
+                        message_ID = 0;
+                    end
+
+                end
+            end
+            ack = 0;
+            tic
+            transmitt_message = 1;
+            count2 = 1;
+            count = count + 1;
+        end
     end
-end
-if(NODE == 1 && ack == 1)
-    count = count + 1;
-    ack = 0;
-    transmitt_message = 1;
-    message_ID = rx_message_id;
-end
+    if(NODE == 1 && ack == 1)
+        count = count + 1;
+        ack = 0;
+        transmitt_message = 1;
+        message_ID = rx_message_id;
+    end
 
-%% MessageBits
+    %% MessageBits
 
-msgSet = zeros(resend * MessageLength, 1); 
-for msgCnt = 0 : resend-1
-    msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
-        sprintf('%s', Message);
-end
+    msgSet = zeros(resend * MessageLength, 1);
+    for msgCnt = 0 : resend-1
+        msgSet(msgCnt * MessageLength + (1 : MessageLength)) = ...
+            sprintf('%s', Message);
+    end
 
-MsgTxOut = msgSet;
-MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 8);];
+    MsgTxOut = msgSet;
+    MsgTxOut = [int2bit(TXID, Number_size);int2bit(message_ID, Message_ID_size);int2bit(MsgTxOut, 8);];
 
-%% CRC Generation
-CRCtxIn = MsgTxOut;
-crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
-CRCtxOut = crcGen(CRCtxIn);
+    %% CRC Generation
+    CRCtxIn = MsgTxOut;
+    crcGen = comm.CRCGenerator('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
+    CRCtxOut = crcGen(CRCtxIn);
 
-%% modululate from real to imaginary numbers and add preamble
-%padding = zeros(14000, 1);
+    %% modululate from real to imaginary numbers and add preamble
+    %padding = zeros(14000, 1);
 
-modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
+    modulateTxIn = [CRCtxOut;]; %%ScramblerTXout;
 
-if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
-    modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
-end
-trail = qpskmod(padding);
-msg = qpskmod(modulateTxIn);
+    if(mod(size(modulateTxIn,1),2) == 1)%must be integer multiple of bits per symbol (2)
+        modulateTxIn = [modulateTxIn; zeros(1, 1);]; %need to add a zero at the end
+    end
+    trail = qpskmod(padding);
+    msg = qpskmod(modulateTxIn);
 
-modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
-
-
-
-txData = txfilter(modSig); %lp filter (make transitions smooth)
-
-if(transmitt_message && (~continous | NODE | barker_test))
-   transmitt_message = 0;
-   tx(txData);
-end
-if(continous && starting_continous && ~NODE && ~barker_test)
-    starting_continous = 0;
-    tx.transmitRepeat(txData)
-end
-
-
-%% ---- Receiver ----
-
-%agcData = agc(rx());
-
-if(Simulate == false)
-    filteredData = rxfilter(rx());
-else
-    filteredData = rxfilter(rxSig);
-end
-
-[~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
-            % average coarse frequency offset estimate, so that carrier
-            % sync is able to lock/converge
-            freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
-            pCnt = pCnt + 1;            % update state
-            pMeanFreqOff = freqOffsetEst;
-            
-%coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);  
-
-coarseFreq = pCoarseFreqCompensator(filteredData,-pMeanFreqOff);     
-
-synchronizedSymbol = symbolSynchronizer(coarseFreq);
-%synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
-synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
-
-ImRxOut = synchronizedCarrier;
-
-%find start of frame
-
-%% detect frame start and phase offset
-corr = xcorr(ImRxOut, ImPreamble); %%do correlation
-L = length(corr);
-[v,i] = max(corr); %i = start of index
-
-%get amplitude and angle of correlation
-amp = abs(v);
-theta = atan2(imag(v),real(v))*180/pi;
-
-%apply offset
-phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
-
-
-preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
-if(size(ImRxOut, 1) - preambleIndex > 0)
-    phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
-    phaseTxOut = phaseOffset(phaseTxOut);
-    rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
-    
-else
-    rxOutTemp = [zeros(1,1)];
-end
-rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
-
-
-EOF = size(TrellisTxOut, 1);
-FrameDetectOut = rxOut(1:EOF);
-
-%% CRC check
-CRCrxIn = FrameDetectOut(1:size(CRCtxOut, 1)); %HammingRxOut;
-% Create a CRC detector with the same settings as the generator
-crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
-% Check the received data for CRC errors
-[detectedData, errFlag] = crcDet(CRCrxIn);
-
-%% reshape bits
-reshapeRxIn = FrameDetectOut; %detectedData;
-%%Extract number
-rx_number_bits = reshapeRxIn(1:7);
-rx_number = bit2int(rx_number_bits,Number_size);
-
-rx_message_id_bits = reshapeRxIn(8:9);
-rx_message_id = bit2int(rx_message_id_bits,Message_ID_size);
-
-% Extract the message bits after the Barker codes
-reshapeRxIn = FrameDetectOut(10:end); %detectedData;
-endOfMessage = MessageLength*8*resend;
-messageBits = reshapeRxIn(1:endOfMessage);
-
-% Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
-% This might need adjustment based on how the bits are packed and the total length
-messageBitsReshaped = reshape(messageBits, 8, [])'; %can be printed if you remove ; and add '
-
-% Convert each 7-bit group to a character
-decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
+    modSig = [trail; ImPreamble; msg; trail;]; %make signal imaginary
 
 
 
-%% ---- Error calculation ---- ack = 1;
-if(RX_LOOP)
-    if(amp > 5)
-        count2 = count2 + 1; 
-        count4 = count4 + 1;        
-        if(barker_test)
-            ack = 1;
-            if(~NODE)
-                PER = count4/count;
-                formatSpec = 'sent:%d recived:%d PER:%f\n';
-                fprintf(formatSpec, count, count4, PER);
+    txData = txfilter(modSig); %lp filter (make transitions smooth)
+
+    if(transmitt_message && (~continous | NODE | barker_test))
+        transmitt_message = 0;
+        tx(txData);
+    end
+    if(continous && starting_continous && ~NODE && ~barker_test)
+        starting_continous = 0;
+        tx.transmitRepeat(txData)
+    end
+
+
+    %% ---- Receiver ----
+
+    %agcData = agc(rx());
+
+    if(Simulate == false)
+        filteredData = rxfilter(rx());
+    else
+        filteredData = rxfilter(rxSig);
+    end
+
+    [~, freqOffsetEst] = pCoarseFreqEstimator(filteredData);   % Coarse frequency offset estimation
+    % average coarse frequency offset estimate, so that carrier
+    % sync is able to lock/converge
+    freqOffsetEst = (freqOffsetEst + pCnt * pMeanFreqOff)/(pCnt+1);
+    pCnt = pCnt + 1;            % update state
+    pMeanFreqOff = freqOffsetEst;
+
+    %coarseFreq = pCoarseFreqCompensator(filteredData,-freqOffsetEst);
+
+    coarseFreq = pCoarseFreqCompensator(filteredData,-pMeanFreqOff);
+
+    synchronizedSymbol = symbolSynchronizer(coarseFreq);
+    %synchronizedCarrier = carrierSynchronizer(coarseFreq); %phase correction
+    synchronizedCarrier = carrierSynchronizer(synchronizedSymbol); %phase correction
+
+    ImRxOut = synchronizedCarrier;
+
+    %find start of frame
+
+    %% detect frame start and phase offset
+    corr = xcorr(ImRxOut, ImPreamble); %%do correlation
+    L = length(corr);
+    [v,i] = max(corr); %i = start of index
+
+    %get amplitude and angle of correlation
+    amp = abs(v);
+    theta = atan2(imag(v),real(v))*180/pi;
+
+    %apply offset
+    phaseOffset = comm.PhaseFrequencyOffset(PhaseOffset=-theta);
+
+
+    preambleIndex = (i-(L+1)/2)+1 + 26; %find start of preamble
+    if(size(ImRxOut, 1) - preambleIndex > 0)
+        phaseTxOut = ImRxOut(preambleIndex:end); %set start of data
+        phaseTxOut = phaseOffset(phaseTxOut);
+        rxOutTemp = qpskdemod(phaseTxOut(1:end)); %generate bits from const diagram
+
+    else
+        rxOutTemp = [zeros(1,1)];
+    end
+    rxOut = [rxOutTemp(1:end); zeros(size(TrellisTxOut, 1),1)];
+
+
+    EOF = size(TrellisTxOut, 1);
+    FrameDetectOut = rxOut(1:EOF);
+
+    %% CRC check
+    CRCrxIn = FrameDetectOut(1:size(CRCtxOut, 1)); %HammingRxOut;
+    % Create a CRC detector with the same settings as the generator
+    crcDet = comm.CRCDetector('Polynomial', 'z^8 + z^2 + z + 1', 'InitialConditions', 1, 'DirectMethod', true, 'FinalXOR', 1);
+    % Check the received data for CRC errors
+    [detectedData, errFlag] = crcDet(CRCrxIn);
+
+    %% reshape bits
+    reshapeRxIn = FrameDetectOut; %detectedData;
+    %%Extract number
+    rx_number_bits = reshapeRxIn(1:7);
+    rx_number = bit2int(rx_number_bits,Number_size);
+
+    rx_message_id_bits = reshapeRxIn(8:9);
+    rx_message_id = bit2int(rx_message_id_bits,Message_ID_size);
+
+    % Extract the message bits after the Barker codes
+    reshapeRxIn = FrameDetectOut(10:end); %detectedData;
+    endOfMessage = MessageLength*8*resend;
+    messageBits = reshapeRxIn(1:endOfMessage);
+
+    % Reshape the message bits into 7-bit rows, assuming the total number of message bits is divisible by 7
+    % This might need adjustment based on how the bits are packed and the total length
+    messageBitsReshaped = reshape(messageBits, 8, [])'; %can be printed if you remove ; and add '
+
+    % Convert each 7-bit group to a character
+    decodedMessage = char(bin2dec(num2str(messageBitsReshaped)));  %can be printed if you remove ; and add '
+
+
+
+    %% ---- Error calculation ---- ack = 1;
+    if(RX_LOOP)
+        if(amp > 5)
+            count2 = count2 + 1;
+            count4 = count4 + 1;
+            if(barker_test)
+                ack = 1;
+                if(~NODE)
+                    PER = count4/count;
+                    formatSpec = 'sent:%d recived:%d PER:%f\n';
+                    fprintf(formatSpec, count, count4, PER);
+                else
+                    formatSpec = 'Count%d\n';
+                    fprintf(formatSpec, count);
+                end
+            end
+        end
+        if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
+            if(NODE) %BER test
+                test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
+                [number,ratio] = biterr(test,CRCrxIn);
+                count5 = count5+1;
+                BER_bits = BER_bits + number;
+                BER = BER + ratio;
+                BER_acc = BER/count5;
+            end
+
+            if(errFlag)
             else
-                formatSpec = 'Count%d\n';
-                fprintf(formatSpec, count);
+                CRCok = CRCok +1;
+            end
+            rate2 = CRCok/count;
+            rate3 = CRCok/count2;
+
+
+            if(NODE)
+
+                if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val && ~continous)
+                    rx_last_val = rx_message_id;
+                    formatSpec = '%s';
+                    fprintf(formatSpec, decodedMessage);
+
+                end
+                if(continous)
+                    rx_last_val = rx_message_id;
+                    formatSpec = '%s PER:%f count%d success:%d failed:%d RX:%d freq:%d BER: %f BER bits:%d\n';
+                    fprintf(formatSpec, decodedMessage, 1-rate3, count2, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc, BER_bits);
+                end
+                if(errFlag == 0 && rx_number == RXID)
+                    ack = 1;
+                end
+                if(eye_test)
+                    eyediagram(coarseFreq(1+preambleIndex:25*sps+preambleIndex), 2*sps)
+                end
+            end
+            if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
+                rx_last_val = rx_message_id;
+                formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
+                fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, 1);
+                if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID && ~BER_test)
+                    ack = 1;
+                end
             end
         end
-    end
-    if(amp > 5 && size(rxOutTemp, 1) > EOF && ~barker_test)
-        if(NODE) %BER test
-            test = [0;0;0;0;0;0;1;0;1;0;1;1;0;1;0;0;0;0;0;0;0;1;0;0;0];
-            [number,ratio] = biterr(test,CRCrxIn);
-            count5 = count5+1;
-            BER_bits = BER_bits + number;
-            BER = BER + ratio;
-            BER_acc = BER/count5;
-        end
-        
-        if(errFlag)
+    else
+
+        if(isequal(TrellsRxOut ,TrellisTxIn))
+            disp('Trellis OK');
         else
-            CRCok = CRCok +1;
+            disp('Trellis not equeal to input');
         end
-        rate2 = CRCok/count;
-        rate3 = CRCok/count2;
-        
+        errors = biterr(TrellisTxOut, TrellsRxIn, [], 'column-wise');
+        errorRate = errors/size(TrellisTxOut, 1);
+        formatSpec = 'Before  Trells, error on %2d out of %2d bits = %.5f\n';
+        fprintf(formatSpec,errors, size(TrellisTxOut, 1), errorRate);
 
-        if(NODE)
-            
-            if(errFlag == 0 && rx_number == RXID && rx_message_id ~= rx_last_val && ~continous)
-                rx_last_val = rx_message_id;
-                formatSpec = '%s';
-                fprintf(formatSpec, decodedMessage);
-                
-            end
-            if(continous)
-                rx_last_val = rx_message_id;
-                formatSpec = '%s PER:%f count%d success:%d failed:%d RX:%d freq:%d BER: %f BER bits:%d\n';
-                fprintf(formatSpec, decodedMessage, 1-rate3, count2, CRCok, count2-CRCok, rx_number, freqOffsetEst, BER_acc, BER_bits);
-            end
-            if(errFlag == 0 && rx_number == RXID)
-                ack = 1;
-            end
-            if(eye_test)
-                eyediagram(coarseFreq(1+preambleIndex:25*sps+preambleIndex), 2*sps)
-            end
+        errors = biterr(TrellisTxIn, TrellsRxOut, [], 'column-wise');
+        errorRate = errors/size(TrellisTxIn, 1);
+        formatSpec = 'After   Trells, error on %2d out of %2d bits = %.5f\n\n';
+        fprintf(formatSpec,errors, size(TrellisTxIn, 1), errorRate);
+
+        %------------------------------------------------------
+        if(isequal(HammingTxIn ,HammingRxOut))
+            disp('Hamming OK');
+        else
+            disp('Hamming not equeal to input');
         end
-        if(~NODE && errFlag == 0 && rx_number == RXID && (rx_message_id ~= rx_last_val || continous))
-            rx_last_val = rx_message_id;
-            formatSpec = 'count:%d   Failed:%d   Success:%d amp:%d success_rate:%f M_ID:%d BER:%d\n';
-            fprintf(formatSpec, count, count-CRCok, CRCok, amp, rate2, rx_message_id, 1);
-            if(errFlag == 0 && rx_number == RXID && rx_message_id == message_ID && ~BER_test)
-                ack = 1;
-            end
+        errors = biterr(HammingRxIn, HammingTxOut, [], 'column-wise');
+        errorRate = errors/size(HammingTxOut, 1);
+        formatSpec = 'Before Hamming, error on %2d out of %2d bits = %.5f\n';
+        fprintf(formatSpec,errors, size(HammingTxOut, 1), errorRate);
+
+        errors = biterr(HammingRxOut, HammingTxIn, [], 'column-wise');
+        errorRate = errors/size(HammingRxOut, 1);
+        formatSpec = 'After  Hamming, error on %2d out of %2d bits = %.5f\n\n';
+        fprintf(formatSpec,errors, size(HammingRxOut, 1), errorRate);
+
+        %------------------------------------------------------
+        if(errFlag)
+            fprintf('CRC ERROR\n\n');
+        else
+            fprintf('CRC OK\n\n');
         end
+
+        %% Print data recived
+        formatSpec = '%s%d\n';
+        fprintf(formatSpec, decodedMessage, rx_number);
     end
-else
+    %% print diagrams
+    %constDiagram1(filteredData*5)
+    %constDiagram2(coarseFreq*5)
+    %constDiagram3(phaseTxOut*5)
+    %constDiagram4(synchronizedSymbol*5)
+    %constDiagram5(synchronizedCarrier*5) %dont know what this is
 
-if(isequal(TrellsRxOut ,TrellisTxIn))
-    disp('Trellis OK');
-else
-    disp('Trellis not equeal to input');
-end
-errors = biterr(TrellisTxOut, TrellsRxIn, [], 'column-wise');
-errorRate = errors/size(TrellisTxOut, 1);
-formatSpec = 'Before  Trells, error on %2d out of %2d bits = %.5f\n';
-fprintf(formatSpec,errors, size(TrellisTxOut, 1), errorRate);
-
-errors = biterr(TrellisTxIn, TrellsRxOut, [], 'column-wise');
-errorRate = errors/size(TrellisTxIn, 1);
-formatSpec = 'After   Trells, error on %2d out of %2d bits = %.5f\n\n';
-fprintf(formatSpec,errors, size(TrellisTxIn, 1), errorRate);
-
-%------------------------------------------------------
-if(isequal(HammingTxIn ,HammingRxOut))
-    disp('Hamming OK');
-else
-    disp('Hamming not equeal to input');
-end
-errors = biterr(HammingRxIn, HammingTxOut, [], 'column-wise');
-errorRate = errors/size(HammingTxOut, 1);
-formatSpec = 'Before Hamming, error on %2d out of %2d bits = %.5f\n';
-fprintf(formatSpec,errors, size(HammingTxOut, 1), errorRate);
-
-errors = biterr(HammingRxOut, HammingTxIn, [], 'column-wise');
-errorRate = errors/size(HammingRxOut, 1);
-formatSpec = 'After  Hamming, error on %2d out of %2d bits = %.5f\n\n';
-fprintf(formatSpec,errors, size(HammingRxOut, 1), errorRate);
-
-%------------------------------------------------------
-if(errFlag)
-    fprintf('CRC ERROR\n\n');
-else
-    fprintf('CRC OK\n\n');
-end
-
-%% Print data recived
-formatSpec = '%s%d\n';
-fprintf(formatSpec, decodedMessage, rx_number);
-end
-%% print diagrams
-%constDiagram1(filteredData*5)
-%constDiagram2(coarseFreq*5)
-%constDiagram3(phaseTxOut*5)
-%constDiagram4(synchronizedSymbol*5)
-%constDiagram5(synchronizedCarrier*5) %dont know what this is
-
-if(TX_LOOP)
-else
- %   release(tx);
-end
+    if(TX_LOOP)
+    else
+        %   release(tx);
+    end
 
 end
